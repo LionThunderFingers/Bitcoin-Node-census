@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>seed.thelionpool.org</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f7f6f3;
+  --surface: #fffefb;
+  --text: #22201c;
+  --text-muted: #605b52;
+  --border: #ddd8cf;
+  --accent: #8a4b1f;
+  --code-text: #2c2820;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171614;
+    --surface: #1e1d1a;
+    --text: #e6e2da;
+    --text-muted: #a39d92;
+    --border: #35332e;
+    --accent: #d99a63;
+    --code-text: #e6e2da;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.wrap {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding-block: 2.5rem 3rem;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+p, li, dd, dt, td, th {
+  max-width: 70ch;
+}
+
+h1 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+h2 {
+  font-size: 1.1rem;
+  line-height: 1.35;
+  margin: 2.5rem 0 0.6rem;
+  font-weight: 600;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.5rem 0 0.4rem;
+  font-weight: 600;
+}
+
+p {
+  margin: 0 0 1rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+.lede {
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.updated {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin: 0 0 2rem;
+}
+
+.note {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  padding: 0.9rem 1rem;
+  margin: 0 0 2rem;
+}
+
+.note p:last-child {
+  margin-bottom: 0;
+}
+
+dl {
+  margin: 0 0 1rem;
+}
+
+dt {
+  font-weight: 600;
+  margin-top: 0.85rem;
+}
+
+dt:first-child {
+  margin-top: 0;
+}
+
+dd {
+  margin: 0.15rem 0 0;
+  color: var(--text-muted);
+  overflow-wrap: break-word;
+}
+
+ul {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+li {
+  margin-bottom: 0.5rem;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  color: var(--code-text);
+}
+
+pre {
+  font-family: var(--mono);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--code-text);
+  padding: 0.75rem 0.9rem;
+  margin: 0 0 0.75rem;
+  overflow-x: auto;
+  white-space: pre;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+pre code {
+  font-size: inherit;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 0 1rem;
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.4rem 1.25rem 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  font-weight: 600;
+}
+
+td.num {
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+footer p {
+  margin: 0 0 0.35rem;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>seed.thelionpool.org</h1>
+  <p class="lede">A DNS seed for the Bitcoin Knots BLAKE2b hardfork. This page
+  documents how the seed is operated, as encouraged by point 6 of Bitcoin
+  Core's <code>doc/dnsseed-policy.md</code>.</p>
+  <p class="updated">Last updated 2026-09-21</p>
+</header>
+
+<div class="note">
+  <p>This seed is not included in any Bitcoin Knots chainparams. It is
+  operated independently. Nothing here implies official status or endorsement
+  of any kind.</p>
+</div>
+
+<h2>Operator</h2>
+<dl>
+  <dt>Operator</dt>
+  <dd>Lionel Wardhaugh</dd>
+  <dt>GitHub</dt>
+  <dd>LionThunderFingers</dd>
+  <dt>Contact</dt>
+  <dd><a href="mailto:knots.seed@gmail.com">knots.seed@gmail.com</a></dd>
+</dl>
+
+<h2>What it serves</h2>
+<dl>
+  <dt>Network</dt>
+  <dd>The Bitcoin Knots BLAKE2b hardfork. Fork height 961640.</dd>
+  <dt>Software</dt>
+  <dd>A fork of <code>sipa/bitcoin-seeder</code>, patched for the fork. It is
+  a live crawler, not a static host list. Source:
+  <a href="https://github.com/LionThunderFingers/BTC-blake2b-seeder">https://github.com/LionThunderFingers/BTC-blake2b-seeder</a></dd>
+  <dt>Seed hostname</dt>
+  <dd><code>seed.thelionpool.org</code></dd>
+  <dt>Authoritative nameserver</dt>
+  <dd><code>ns-seed.thelionpool.org</code> (<code>185.183.159.199</code>)</dd>
+  <dt>DNS TTL</dt>
+  <dd>3600 seconds</dd>
+  <dt>Hosting</dt>
+  <dd>A dedicated VPS, funded through approximately March 2027. Monitored with
+  external alerting.</dd>
+</dl>
+
+<h2>Service bits, and a deliberate deviation</h2>
+<p>Two service-bit filter prefixes are supported:</p>
+<ul>
+  <li><code>x10000009</code> &mdash;
+  <code>NODE_NETWORK|NODE_WITNESS|NODE_BLAKE2B</code></li>
+  <li><code>x10000408</code></li>
+</ul>
+<p>A bare hostname query, with no filter prefix, also has
+<code>NODE_BLAKE2B</code> forced on. The seed therefore never returns a
+non-fork node, under any query. This is a deliberate deviation from stock
+<code>bitcoin-seeder</code> behaviour.</p>
+<p>The reason: the fork shares port 8333 with the much larger SHA256d network.
+An unfiltered answer would be composed mostly of peers that are useless to a
+fork node.</p>
+
+<h2>How to use it</h2>
+<p>Query the seed directly:</p>
+<pre><code>dig +short x10000009.seed.thelionpool.org</code></pre>
+<p>Or point a node at it:</p>
+<pre><code>bitcoind -seednode=seed.thelionpool.org</code></pre>
+
+<h2>Status</h2>
+<p>The figures below are a point-in-time sample taken 2026-09-21. They are not
+live and this page does not update itself.</p>
+<div class="table-scroll">
+<table>
+  <tbody>
+    <tr>
+      <th scope="row">Nodes tracked (all)</th>
+      <td class="num">3437</td>
+    </tr>
+    <tr>
+      <th scope="row">BLAKE2b nodes tracked</th>
+      <td class="num">421</td>
+    </tr>
+    <tr>
+      <th scope="row">BLAKE2b nodes rated good</th>
+      <td class="num">118</td>
+    </tr>
+    <tr>
+      <th scope="row">Addresses returned per DNS answer</th>
+      <td class="num">24</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+<p>24 addresses is a full 512-byte UDP response.</p>
+
+<h2>Incident: served set collapse, 2026-09-20</h2>
+<p>For roughly 30 hours up to 2026-09-20 the seed's served set collapsed from
+2967 nodes to 158, and DNS answers fell to 1&ndash;2 addresses.</p>
+
+<h3>Cause</h3>
+<p>The crawler selects nodes from a single FIFO shared with the whole SHA256d
+network. That queue held approximately 257,000 addresses while only about 400
+of them were fork nodes. A full cycle took about 2.3 hours.</p>
+<p>The seeder rates a node "good" using a decaying counter (tau = 2 hours)
+that requires more than 2 observations. That means a node must be polled at
+least every tau*ln2 = 83 minutes to stay rated. At a 2.3 hour cycle, fork
+nodes decayed out of the served set while still being perfectly reachable.</p>
+
+<h3>Fix</h3>
+<p>A second rotation queue was added for nodes confirmed to advertise
+<code>NODE_BLAKE2B</code>, given a fixed 5% share of crawl picks. Enrolment
+requires a successful handshake, so gossip-advertised service bits alone do
+not qualify a node.</p>
+
+<h3>Result</h3>
+<p>Fork nodes polled within the 83-minute window went from 46 of 396 to 291 of
+379, and DNS answers returned to a full packet.</p>
+<p>The fix is in the public repository linked above.</p>
+
+<h2>Policy compliance</h2>
+<p>Against <code>doc/dnsseed-policy.md</code>:</p>
+<ul>
+  <li>Results are crawled live. They are not biased or filtered per
+  requester.</li>
+  <li>Each answer is a randomly selected subset of the currently-good set, so
+  two queries will usually differ. No requester or group of requesters is
+  singled out to receive different results.</li>
+  <li>TTL is 3600 seconds, comfortably above the 60s minimum.</li>
+  <li>DNS query logs are not retained or shared. Only operational crawl data
+  is kept.</li>
+  <li>Crawl data &mdash; which nodes were reachable &mdash; may be published.
+  It is not made more complete by biasing connectivity.</li>
+  <li>A contact address is published here, and is also in the zone's SOA
+  RNAME.</li>
+</ul>
+<p>No compliance is claimed beyond the points listed above.</p>
+
+<footer>
+  <p>Last updated 2026-09-21.</p>
+  <p>Contact: <a href="mailto:knots.seed@gmail.com">knots.seed@gmail.com</a></p>
+</footer>
+
+</div>
+</body>
+</html>
