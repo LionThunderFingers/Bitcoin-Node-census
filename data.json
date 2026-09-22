@@ -7,7 +7,13 @@
  "b2b_polled_recently": 305,
  "b2b_reachable": 144,
  "dump_ts": 1790081738,
- "enforcing_versions": [],
+ "enforcing_versions": [
+  "/Satoshi:29.4.2/Knots:20260508/",
+  "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/",
+  "/Satoshi:29.4.2(Undersector XBT)/Knots:20260508/",
+  "/Satoshi:29.4.2/Knots:20260508rc2/",
+  "/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/"
+ ],
  "heights": {
   "behind": 3,
   "day": 7,
