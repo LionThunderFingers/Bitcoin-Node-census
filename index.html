@@ -77,11 +77,31 @@ section{margin-top:40px}
 .bar-fill{height:100%;background:var(--signal)}
 .bar-row.rc .bar-fill{background:var(--warn)}
 .bar-row.odd .bar-fill{background:var(--crit)}
-.countdown{display:flex;flex-wrap:wrap;gap:20px 34px;align-items:baseline;
+.countdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+           gap:20px 34px;align-items:start;
            background:var(--surface);border:1px solid var(--beacon);padding:19px}
 .countdown .big{font-family:var(--mono);font-size:clamp(28px,5vw,40px);font-weight:600;
-                color:var(--beacon);line-height:1;font-variant-numeric:tabular-nums}
+                color:var(--beacon);line-height:1;font-variant-numeric:tabular-nums;
+                overflow-wrap:anywhere}
 .countdown .lbl{font-size:13px;color:var(--text-2);margin-top:6px}
+.countdown .sub{margin-top:3px;font-size:11.5px;color:var(--text-3)}
+/* The heading numeral stays tabular but must not inherit mono cell metrics inside a
+   condensed-sans h2, which is what made "973,440" read as "973 , 440". */
+.sec-head h2 .num{font-family:inherit;font-weight:inherit}
+.act-block{margin-top:18px;background:var(--surface);border:1px solid var(--line-soft);
+           padding:17px 19px}
+.act-block h3{font-family:var(--cond);font-size:15px;line-height:1.3;margin:0;
+              letter-spacing:-.005em}
+.act-track{margin-top:12px;height:8px;background:var(--surface-2);overflow:hidden}
+.act-fill{display:block;height:100%;background:var(--beacon)}
+.act-text{margin:9px 0 0;font-size:12.5px;color:var(--text-2)}
+.ne-head{display:flex;flex-wrap:wrap;gap:3px 12px;align-items:baseline;margin-top:11px}
+.ne-head .big{font-family:var(--mono);font-size:clamp(24px,4vw,30px);font-weight:600;
+              line-height:1;color:var(--crit);font-variant-numeric:tabular-nums}
+.ne-head .lbl{font-size:13px;color:var(--text-2)}
+.ne-list{margin-top:15px}
+.ne-list .bar-fill{background:var(--crit)}
+.ne-note{margin:11px 0 0;font-size:11.5px;color:var(--text-3)}
 .scroll{overflow-x:auto;border:1px solid var(--line-soft)}
 table{border-collapse:collapse;width:100%;background:var(--surface);font-size:14px}
 th,td{padding:10px 13px;text-align:left;border-bottom:1px solid var(--line-soft)}
@@ -142,15 +162,48 @@ footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--line-soft);
 
   <section id="activationSection">
     <div class="sec-head">
-      <h2>Long coinbase maturity activates at block <span class="num" id="actHeight">&mdash;</span></h2>
-      <p>PR #419 changes a consensus rule. Nodes that have not upgraded by then are running
-         different rules from those that have.</p>
+      <h2 id="actTitle">Long coinbase maturity activates at block
+        <span class="num" id="actHeight">&mdash;</span></h2>
+      <p id="actWindowLine" hidden></p>
+      <p>PR #419 changes a consensus rule. A node on an older release is not necessarily on a
+         different chain: it only diverges if a block spends a coinbase output younger than the
+         long maturity.</p>
     </div>
     <div class="countdown">
-      <div><div class="big num" id="cdBlocks">&mdash;</div><div class="lbl">blocks remaining</div></div>
-      <div><div class="big num" id="cdDays">&mdash;</div><div class="lbl">days, at ~10 min/block</div></div>
-      <div><div class="big num" id="cdReady">&mdash;</div>
-        <div class="lbl">of reachable fork nodes on a release containing it</div></div>
+      <div>
+        <div class="big num" id="cdBlocks">&mdash;</div>
+        <div class="lbl" id="cdBlocksLbl">blocks remaining</div>
+        <div class="sub" id="cdBlocksSub" hidden></div>
+      </div>
+      <div>
+        <div class="big num" id="cdDays">&mdash;</div>
+        <div class="lbl" id="cdDaysLbl">days, at ~10 min/block</div>
+        <div class="sub" id="cdDaysSub" hidden></div>
+      </div>
+      <div>
+        <div class="big num" id="cdReady">&mdash;</div>
+        <div class="lbl" id="cdReadyLbl">of reachable fork nodes on a release containing it</div>
+        <div class="sub" id="cdReadySub" hidden></div>
+      </div>
+    </div>
+
+    <div class="act-block" id="actProgress" hidden>
+      <h3 id="actProgressHead">Position in the long maturity window</h3>
+      <div class="act-track" id="actBar" role="progressbar"
+           aria-label="Position in the long coinbase maturity window, in blocks">
+        <span class="act-fill" id="actFill" style="width:0%"></span>
+      </div>
+      <p class="act-text" id="actProgressText">&mdash;</p>
+    </div>
+
+    <div class="act-block" id="actRisk" hidden>
+      <h3>Reachable fork nodes not on an enforcing release</h3>
+      <div class="ne-head">
+        <span class="big num" id="neCount">&mdash;</span>
+        <span class="lbl" id="neCountLbl">of the reachable fork nodes counted</span>
+      </div>
+      <div class="bars ne-list" id="neList"></div>
+      <p class="ne-note" id="neNote"></p>
     </div>
   </section>
 
@@ -261,6 +314,16 @@ footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--line-soft);
 
 <script>
 const fmt = n => Number(n).toLocaleString("en-GB");
+const DASH = "\u2014";
+// Every value that reaches the DOM goes through these, so a missing or malformed field
+// degrades to an em-dash instead of printing NaN / undefined / Infinity.
+const numOr = (v, fb) => { const n = Number(v); return Number.isFinite(n) ? n : fb; };
+const fmtOr = v => Number.isFinite(Number(v)) ? fmt(Number(v)) : DASH;
+const clamp = (n, lo, hi) => n < lo ? lo : n > hi ? hi : n;
+const days = b => (Math.abs(b) < 0.05 ? 0 : b * 10 / 60 / 24).toFixed(1);
+const esc = v => String(v).replace(/[&<>"']/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const $ = id => document.getElementById(id);
 
 function showError(msg) {
   const e = document.getElementById("err");
@@ -276,7 +339,10 @@ function render(d) {
   document.getElementById("figCrawl").textContent = fmt(d.total);
   document.getElementById("figTip").textContent = fmt(d.max_height);
 
-  const entries = Object.entries(d.versions).sort((a, b) => b[1] - a[1]);
+  const versions = (d.versions && typeof d.versions === "object") ? d.versions : {};
+  const entries = Object.entries(versions)
+    .map(([name, n]) => [String(name), numOr(n, 0)])
+    .sort((a, b) => b[1] - a[1]);
   const max = Math.max(...entries.map(e => e[1]), 1);
   const enforcing = d.enforcing_versions || [];
   document.getElementById("versionBars").innerHTML = entries.map(([name, n]) => {
@@ -286,21 +352,13 @@ function render(d) {
     const tag = isOdd ? "  — not Knots, but claims the fork bit"
               : isRc ? "  — release candidate" : "";
     return `<div class="bar-row ${cls}">
-      <span class="bar-label">${name}${tag}</span>
+      <span class="bar-label">${esc(name)}${tag}</span>
       <span class="bar-val">${n}</span>
       <span class="bar-track"><span class="bar-fill" style="width:${(n / max * 100).toFixed(1)}%"></span></span>
     </div>`;
   }).join("");
 
-  const act = d.activation_height;
-  document.getElementById("actHeight").textContent = fmt(act);
-  const remaining = act - d.max_height;
-  document.getElementById("cdBlocks").textContent = remaining > 0 ? fmt(remaining) : "activated";
-  document.getElementById("cdDays").textContent =
-    remaining > 0 ? (remaining * 10 / 60 / 24).toFixed(1) : "—";
-  const ready = entries.filter(([v]) => enforcing.includes(v)).reduce((a, [, n]) => a + n, 0);
-  document.getElementById("cdReady").textContent =
-    d.b2b_reachable ? Math.round(ready / d.b2b_reachable * 100) + "%" : "—";
+  renderActivation(d, entries, enforcing);
 
   const h = d.heights || {};
   document.getElementById("heightRows").innerHTML = [
@@ -309,6 +367,162 @@ function render(d) {
     ["Within 144 blocks (about a day)", h.day],
     ["More than 144 blocks behind", h.behind]
   ].map(([l, n]) => `<tr><td>${l}</td><td class="n">${n ?? 0}</td></tr>`).join("");
+}
+
+function renderActivation(d, entries, enforcing) {
+  // 979920 is the height at which NORMAL coinbase maturity resumes; 979919 is the last
+  // block under the long maturity rule. Hardcoded fallback until data.json publishes
+  // activation_end_height — once it does, this line alone starts using the real value.
+  const MATURITY_RELEASE_HEIGHT = 979920;
+  const relH = numOr(d.activation_end_height ?? MATURITY_RELEASE_HEIGHT, MATURITY_RELEASE_HEIGHT);
+  const act = numOr(d.activation_height, null);
+  const tip = numOr(d.max_height, null);
+  const reach = Math.max(0, numOr(d.b2b_reachable, 0));
+
+  const title = $("actTitle"), windowLine = $("actWindowLine");
+  const progress = $("actProgress"), risk = $("actRisk");
+
+  const setTile = (id, big, lbl, sub) => {
+    $(id).textContent = big;
+    $(id + "Lbl").textContent = lbl;
+    const s = $(id + "Sub");
+    s.textContent = sub || "";
+    s.hidden = !sub;
+  };
+
+  // --- Neutral fallback: without both heights there is no honest state to show. ---
+  if (act === null || tip === null) {
+    title.innerHTML = 'Long coinbase maturity, activation height ' +
+      '<span class="num" id="actHeight">' + DASH + "</span>";
+    windowLine.hidden = true;
+    progress.hidden = true;
+    risk.hidden = true;
+    setTile("cdBlocks", DASH, "blocks remaining", "");
+    setTile("cdDays", DASH, "days, at ~10 min/block", "");
+    setTile("cdReady", DASH, "of reachable fork nodes on a release containing it", "");
+    return;
+  }
+
+  // Sum of nodes whose user agent is listed as containing the rule.
+  const ready = entries
+    .filter(([v]) => enforcing.includes(v))
+    .reduce((a, [, n]) => a + n, 0);
+  const pct = reach > 0 ? Math.round(ready / reach * 100) + "%" : DASH;
+  const pctSub = reach > 0
+    ? fmt(ready) + " of " + fmt(reach) + " reachable fork nodes"
+    : "no reachable fork nodes counted";
+
+  // ---------------- STATE A: not yet activated ----------------
+  if (tip < act) {
+    title.innerHTML = 'Long coinbase maturity activates at block ' +
+      '<span class="num" id="actHeight">' + fmt(act) + "</span>";
+    windowLine.hidden = true;
+    progress.hidden = true;
+    risk.hidden = true;
+    const remaining = act - tip;
+    setTile("cdBlocks", fmt(remaining), "blocks remaining", "");
+    setTile("cdDays", days(remaining), "days, at ~10 min/block", "");
+    setTile("cdReady", pct, "of reachable fork nodes on a release containing it", pctSub);
+    return;
+  }
+
+  // ---------------- STATE B: in force (or window complete) ----------------
+  const span = relH - act;                       // window length in blocks
+  const lastBlock = span > 0 ? relH - 1 : null;  // last block under the long maturity rule
+  const complete = span > 0 && tip >= relH;
+  const elapsed = tip - act;
+  const toRelease = span > 0 ? Math.max(0, relH - tip) : null;
+
+  title.textContent = complete
+    ? "Long coinbase maturity window is complete"
+    : "Long coinbase maturity is in force";
+
+  if (span > 0) {
+    windowLine.textContent =
+      "Took effect at block " + fmt(act) + " and is in force through block " + fmt(lastBlock) +
+      " \u2014 " + fmt(span) + " blocks, about " + Math.round(span * 10 / 60 / 24) +
+      " days. Normal maturity resumes at block " + fmt(relH) + ".";
+  } else {
+    windowLine.textContent = "Took effect at block " + fmt(act) + ".";
+  }
+  windowLine.hidden = false;
+
+  setTile("cdBlocks", fmt(elapsed), "blocks since it took effect",
+    "about " + days(elapsed) + " days, at ~10 min/block");
+
+  if (toRelease === null) {
+    setTile("cdDays", DASH, "blocks until normal maturity resumes",
+      "window end height unavailable");
+  } else if (complete) {
+    setTile("cdDays", "0", "blocks until normal maturity resumes at block " + fmt(relH),
+      "window complete \u2014 normal maturity has resumed");
+  } else {
+    setTile("cdDays", fmt(toRelease),
+      "blocks until normal maturity resumes at block " + fmt(relH),
+      "about " + days(toRelease) + " days, at ~10 min/block");
+  }
+
+  setTile("cdReady", pct, "of reachable fork nodes on a release containing it", pctSub);
+
+  // ---- progress through the window ----
+  if (span > 0) {
+    const now = clamp(tip, act, relH);
+    const frac = clamp((now - act) / span, 0, 1);
+    const bar = $("actBar");
+    bar.setAttribute("aria-valuemin", String(act));
+    bar.setAttribute("aria-valuemax", String(relH));
+    bar.setAttribute("aria-valuenow", String(now));
+    bar.setAttribute("aria-valuetext",
+      "block " + fmt(now) + " of " + fmt(relH) + ", " + Math.round(frac * 100) + " per cent");
+    $("actFill").style.width = (frac * 100).toFixed(1) + "%";
+    $("actProgressText").textContent = complete
+      ? "Highest block seen is " + fmt(tip) + ", past the end of the window. All " +
+        fmt(span) + " blocks (" + fmt(act) + " through " + fmt(lastBlock) + ") are behind us."
+      : "Block " + fmt(tip) + " of the " + fmt(span) + "-block window (" + fmt(act) +
+        " through " + fmt(lastBlock) + "): " + fmt(elapsed) + " blocks in, " + fmt(toRelease) +
+        " to go, " + Math.round(frac * 100) + "% through.";
+    progress.hidden = false;
+  } else {
+    progress.hidden = true;
+  }
+
+  // ---- non-enforcing breakdown ----
+  const nonEnf = entries.filter(([v]) => !enforcing.includes(v));
+  const listed = nonEnf.reduce((a, [, n]) => a + n, 0);
+  const headline = clamp(reach - ready, 0, Number.MAX_SAFE_INTEGER);
+  $("neCount").textContent = reach > 0 ? fmt(headline) : DASH;
+  $("neCountLbl").textContent = reach > 0
+    ? "of " + fmt(reach) + " reachable fork nodes are not on a release containing the rule"
+    : "no reachable fork nodes counted, so there is nothing to measure against";
+
+  const rows = nonEnf.slice();
+  const unrecorded = headline - listed;
+  if (reach > 0 && unrecorded > 0) rows.push(["software not recorded", unrecorded]);
+  const rowMax = Math.max(...rows.map(r => r[1]), 1);
+  $("neList").innerHTML = rows.length
+    ? rows.map(([name, n]) => {
+        // OracleKnots is a third-party build whose source cannot be verified from a user
+        // agent string. It is listed as unverified, never as failing to enforce.
+        const tag = /oracle/i.test(name) ? "  \u2014 unverified third-party build" : "";
+        return '<div class="bar-row">' +
+          '<span class="bar-label">' + esc(name) + esc(tag) + "</span>" +
+          '<span class="bar-val">' + fmt(n) + "</span>" +
+          '<span class="bar-track"><span class="bar-fill" style="width:' +
+          (n / rowMax * 100).toFixed(1) + '%"></span></span></div>';
+      }).join("")
+    : '<p class="ne-note" style="margin-top:0">' + (reach > 0
+        ? "Every reachable fork node the crawler identified is on a release containing the rule."
+        : "No reachable fork node was counted this crawl, so there is nothing to break down.") +
+      "</p>";
+
+  $("neNote").textContent = unrecorded > 0
+    ? "Counts come from the user agent each node reported. " + fmt(unrecorded) +
+      " node(s) are in the reachable total but reported no software this crawl, so they are " +
+      "shown as not recorded rather than attributed to a release."
+    : "Counts come from the user agent each node reported. A node on an older release is " +
+      "only on a different chain if a block spends a coinbase output younger than the long " +
+      "maturity.";
+  risk.hidden = false;
 }
 
 function renderStable(s) {
