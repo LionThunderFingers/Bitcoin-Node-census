@@ -1,13 +1,13 @@
 {
  "activation_end_height": 979920,
  "activation_height": 973440,
- "b2b": 404,
- "b2b_poll_age_max": 450369,
- "b2b_poll_age_median": 2210,
- "b2b_poll_age_p90": 130429,
- "b2b_polled_recently": 310,
- "b2b_reachable": 133,
- "dump_ts": 1790187357,
+ "b2b": 385,
+ "b2b_poll_age_max": 453971,
+ "b2b_poll_age_median": 2488,
+ "b2b_poll_age_p90": 138669,
+ "b2b_polled_recently": 304,
+ "b2b_reachable": 125,
+ "dump_ts": 1790190557,
  "enforcing_versions": [
   "/Satoshi:29.4.2/Knots:20260508/",
   "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/",
@@ -16,23 +16,23 @@
   "/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/"
  ],
  "heights": {
-  "behind": 2,
+  "behind": 3,
   "day": 3,
-  "near": 50,
-  "tip": 78
+  "near": 60,
+  "tip": 59
  },
  "heights_by_enforcement": {
   "enforcing": {
-   "behind": 2,
-   "day": 2,
-   "near": 36,
-   "tip": 61
+   "behind": 3,
+   "day": 1,
+   "near": 47,
+   "tip": 45
   },
   "not_enforcing": {
    "behind": 0,
-   "day": 1,
-   "near": 14,
-   "tip": 17
+   "day": 2,
+   "near": 13,
+   "tip": 14
   }
  },
  "heights_by_version": {
@@ -50,9 +50,9 @@
   },
   "/Satoshi:29.4.1/Knots:20260508/": {
    "behind": 0,
-   "day": 1,
-   "near": 12,
-   "tip": 14
+   "day": 2,
+   "near": 11,
+   "tip": 11
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
    "behind": 0,
@@ -79,31 +79,31 @@
    "tip": 2
   },
   "/Satoshi:29.4.2/Knots:20260508/": {
-   "behind": 2,
-   "day": 2,
-   "near": 35,
-   "tip": 55
+   "behind": 3,
+   "day": 1,
+   "near": 44,
+   "tip": 40
   },
   "/Satoshi:29.4.2/Knots:20260508rc2/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 2
+   "near": 3,
+   "tip": 1
   }
  },
- "max_height": 973823,
- "reachable": 3504,
- "total": 9112,
- "ts": 1790188772,
+ "max_height": 973824,
+ "reachable": 3465,
+ "total": 9086,
+ "ts": 1790192374,
  "versions": {
   "/OracleKnots:29.4.2(Forever Money)/OracleKnots:20260508rc2/": 1,
   "/Satoshi:29.4.1()/Knots:20260508/": 1,
-  "/Satoshi:29.4.1/Knots:20260508/": 27,
+  "/Satoshi:29.4.1/Knots:20260508/": 24,
   "/Satoshi:29.4.1/Knots:20260508rc4/": 3,
   "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/": 1,
   "/Satoshi:29.4.2(Undersector XBT)/Knots:20260508/": 1,
   "/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": 2,
-  "/Satoshi:29.4.2/Knots:20260508/": 94,
-  "/Satoshi:29.4.2/Knots:20260508rc2/": 3
+  "/Satoshi:29.4.2/Knots:20260508/": 88,
+  "/Satoshi:29.4.2/Knots:20260508rc2/": 4
  }
 }
