@@ -1,13 +1,13 @@
 {
  "activation_end_height": 979920,
  "activation_height": 973440,
- "b2b": 379,
- "b2b_poll_age_max": 511607,
- "b2b_poll_age_median": 326,
- "b2b_poll_age_p90": 99976,
- "b2b_polled_recently": 299,
- "b2b_reachable": 120,
- "dump_ts": 1790249790,
+ "b2b": 376,
+ "b2b_poll_age_max": 515210,
+ "b2b_poll_age_median": 681,
+ "b2b_poll_age_p90": 68752,
+ "b2b_polled_recently": 296,
+ "b2b_reachable": 123,
+ "dump_ts": 1790252991,
  "enforcing_versions": [
   "/Satoshi:29.4.2/Knots:20260508/",
   "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/",
@@ -16,23 +16,23 @@
   "/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/"
  ],
  "heights": {
-  "behind": 0,
-  "day": 5,
-  "near": 19,
-  "tip": 96
+  "behind": 2,
+  "day": 7,
+  "near": 11,
+  "tip": 103
  },
  "heights_by_enforcement": {
   "enforcing": {
-   "behind": 0,
-   "day": 5,
-   "near": 16,
-   "tip": 72
+   "behind": 2,
+   "day": 6,
+   "near": 7,
+   "tip": 78
   },
   "not_enforcing": {
    "behind": 0,
-   "day": 0,
-   "near": 3,
-   "tip": 24
+   "day": 1,
+   "near": 4,
+   "tip": 25
   }
  },
  "heights_by_version": {
@@ -45,58 +45,44 @@
   "/Satoshi:29.4.1()/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 0
+   "near": 0,
+   "tip": 1
   },
   "/Satoshi:29.4.1/Knots:20260508/": {
    "behind": 0,
-   "day": 0,
-   "near": 2,
-   "tip": 20
+   "day": 1,
+   "near": 4,
+   "tip": 19
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
    "behind": 0,
    "day": 0,
    "near": 0,
-   "tip": 3
-  },
-  "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/": {
-   "behind": 0,
-   "day": 0,
-   "near": 0,
-   "tip": 1
-  },
-  "/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": {
-   "behind": 0,
-   "day": 0,
-   "near": 0,
-   "tip": 1
+   "tip": 4
   },
   "/Satoshi:29.4.2/Knots:20260508/": {
-   "behind": 0,
-   "day": 5,
-   "near": 16,
-   "tip": 67
+   "behind": 2,
+   "day": 6,
+   "near": 7,
+   "tip": 76
   },
   "/Satoshi:29.4.2/Knots:20260508rc2/": {
    "behind": 0,
    "day": 0,
    "near": 0,
-   "tip": 3
+   "tip": 2
   }
  },
- "max_height": 973927,
- "reachable": 3485,
- "total": 8999,
- "ts": 1790250010,
+ "max_height": 973933,
+ "reachable": 3431,
+ "total": 9039,
+ "ts": 1790253613,
  "versions": {
   "/OracleKnots:29.4.2(Forever Money)/OracleKnots:20260508rc2/": 1,
   "/Satoshi:29.4.1()/Knots:20260508/": 1,
-  "/Satoshi:29.4.1/Knots:20260508/": 22,
-  "/Satoshi:29.4.1/Knots:20260508rc4/": 3,
-  "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/": 1,
-  "/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": 1,
-  "/Satoshi:29.4.2/Knots:20260508/": 88,
-  "/Satoshi:29.4.2/Knots:20260508rc2/": 3
+  "/Satoshi:29.4.1/Knots:20260508/": 24,
+  "/Satoshi:29.4.1/Knots:20260508rc4/": 4,
+  "/Satoshi:29.4.2/Knots:20260508/": 91,
+  "/Satoshi:29.4.2/Knots:20260508rc2/": 2
  }
 }
