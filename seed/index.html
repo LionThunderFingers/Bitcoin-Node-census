@@ -203,12 +203,13 @@ footer p {
 <body>
 <div class="wrap">
 
+
 <header>
   <h1>seed.thelionpool.org</h1>
   <p class="lede">A DNS seed for the Bitcoin Knots BLAKE2b hardfork. This page
-  documents how the seed is operated, as encouraged by point 6 of Bitcoin
-  Core's <code>doc/dnsseed-policy.md</code>.</p>
-  <p class="updated">Last updated 2026-09-21</p>
+  documents how the seed is operated, as encouraged by point 6 of
+  <code>doc/dnsseed-policy.md</code>.</p>
+  <p class="updated">Last updated 2026-09-28</p>
 </header>
 
 <div class="note">
@@ -232,34 +233,55 @@ footer p {
   <dt>Network</dt>
   <dd>The Bitcoin Knots BLAKE2b hardfork. Fork height 961640.</dd>
   <dt>Software</dt>
-  <dd>A fork of <code>sipa/bitcoin-seeder</code>, patched for the fork. It is
-  a live crawler, not a static host list. Source:
-  <a href="https://github.com/LionThunderFingers/BTC-blake2b-seeder">https://github.com/LionThunderFingers/BTC-blake2b-seeder</a></dd>
+  <dd>LionSeed, a DNS seeder written from scratch for the BLAKE2b network
+  (Rust, MIT licence). It is a live crawler, not a static host list. It crawls
+  clearnet, Tor v3 and I2P nodes. Source:
+  <a href="https://github.com/LionThunderFingers/LionSeed">https://github.com/LionThunderFingers/LionSeed</a></dd>
   <dt>Seed hostname</dt>
   <dd><code>seed.thelionpool.org</code></dd>
   <dt>Authoritative nameserver</dt>
   <dd><code>ns-seed.thelionpool.org</code> (<code>185.183.159.199</code>)</dd>
+  <dt>Transport</dt>
+  <dd>UDP and TCP on port 53. A, AAAA, NS and SOA records.</dd>
   <dt>DNS TTL</dt>
-  <dd>3600 seconds</dd>
+  <dd>60 seconds for A and AAAA answers, so clients get a fresh selection
+  often. NS and SOA records use 40000 seconds.</dd>
   <dt>Hosting</dt>
   <dd>A dedicated VPS, funded through approximately March 2027. Monitored with
   external alerting.</dd>
 </dl>
 
-<h2>Service bits, and a deliberate deviation</h2>
-<p>Two service-bit filter prefixes are supported:</p>
-<ul>
-  <li><code>x10000009</code> &mdash;
-  <code>NODE_NETWORK|NODE_WITNESS|NODE_BLAKE2B</code></li>
-  <li><code>x10000408</code></li>
-</ul>
-<p>A bare hostname query, with no filter prefix, also has
-<code>NODE_BLAKE2B</code> forced on. The seed therefore never returns a
-non-fork node, under any query. This is a deliberate deviation from stock
-<code>bitcoin-seeder</code> behaviour.</p>
+<h2>Only fork nodes, under any query</h2>
+<p>Every service-bit filter of the form <code>x&lt;hex&gt;</code> is accepted,
+for example <code>x10000009</code> (<code>NODE_NETWORK|NODE_WITNESS|NODE_BLAKE2B</code>)
+or <code>x9</code>. A bare hostname query uses <code>x9</code>.</p>
+<p>Whatever the filter, the only nodes that can ever appear in an answer are
+nodes this seed has itself confirmed to be on the fork. So a bare or
+<code>x9</code> query never returns a non-fork node. This is a deliberate
+deviation from stock seeder behaviour.</p>
 <p>The reason: the fork shares port 8333 with the much larger SHA256d network.
 An unfiltered answer would be composed mostly of peers that are useless to a
 fork node.</p>
+
+<h2>How nodes are chosen</h2>
+<p>A node is served only when all of these hold:</p>
+<ul>
+  <li>The seed completed a handshake with it and the node advertised
+  <code>NODE_BLAKE2B</code> (service bit 28) in its own version message.
+  Service bits gossiped by other peers are never trusted on their own.</li>
+  <li>It reported a height of at least 961640 and advertises
+  <code>NODE_NETWORK</code>.</li>
+  <li>It answered a handshake within the last hour. Fork nodes are re-checked
+  every 15 minutes, so a node that goes away drops out of answers quickly.</li>
+  <li>It has a good reliability record over recent checks.</li>
+</ul>
+<p>Each answer is a random selection of up to 24 of these nodes, at most one
+per /16 (IPv4) or /32 (IPv6) network, so no single provider can fill an
+answer. DNS answers carry clearnet addresses only. Tor and I2P nodes are
+crawled for the census and the crawl data, since DNS cannot carry those
+addresses.</p>
+<p>The seed does not filter by user agent or node version. Any node that
+follows the fork's consensus rules is treated the same.</p>
 
 <h2>How to use it</h2>
 <p>Query the seed directly:</p>
@@ -268,76 +290,101 @@ fork node.</p>
 <pre><code>bitcoind -seednode=seed.thelionpool.org</code></pre>
 
 <h2>Status</h2>
-<p>The figures below are a point-in-time sample taken 2026-09-21. They are not
-live and this page does not update itself.</p>
+<p>The figures below are a point-in-time sample taken 2026-09-27 22:49 UTC,
+about 80 minutes after LionSeed went live. They are not live and this page
+does not update itself. See the <a href="../">census</a> for current
+figures.</p>
 <div class="table-scroll">
 <table>
+  <thead>
+    <tr>
+      <th scope="col"></th>
+      <th scope="col">Fork nodes</th>
+      <th scope="col">Rated good</th>
+    </tr>
+  </thead>
   <tbody>
     <tr>
-      <th scope="row">Nodes tracked (all)</th>
-      <td class="num">3437</td>
+      <th scope="row">Clearnet</th>
+      <td class="num">217</td>
+      <td class="num">108</td>
     </tr>
     <tr>
-      <th scope="row">BLAKE2b nodes tracked</th>
-      <td class="num">421</td>
+      <th scope="row">I2P</th>
+      <td class="num">101</td>
+      <td class="num">75</td>
     </tr>
     <tr>
-      <th scope="row">BLAKE2b nodes rated good</th>
-      <td class="num">118</td>
+      <th scope="row">Tor</th>
+      <td class="num">22</td>
+      <td class="num">15</td>
     </tr>
     <tr>
-      <th scope="row">Addresses returned per DNS answer</th>
-      <td class="num">24</td>
+      <th scope="row">Total</th>
+      <td class="num">362</td>
+      <td class="num">208</td>
     </tr>
   </tbody>
 </table>
 </div>
-<p>24 addresses is a full 512-byte UDP response.</p>
+<p>Addresses tracked across all networks: 215,276. Addresses returned per DNS
+answer: 24, a full 512-byte UDP response.</p>
+
+<h2>Software change, 2026-09-27</h2>
+<p>Until 2026-09-27 this seed ran a patched fork of
+<code>sipa/bitcoin-seeder</code>. On 2026-09-27 at 21:28 UTC it was replaced
+by LionSeed. The seed hostname, nameserver and IP address did not change.</p>
+<p>The reason was the incident below. The old crawler worked through one queue
+shared with the whole SHA256d network, and the fork nodes kept getting
+starved. LionSeed schedules each node by what it already knows about it: fork
+nodes every 15 minutes, new addresses as soon as possible, non-fork nodes once
+a day. It also crawls Tor and I2P, which the old seeder could not.</p>
 
 <h2>Incident: served set collapse, 2026-09-20</h2>
+<p>This happened on the previous software.</p>
 <p>For roughly 30 hours up to 2026-09-20 the seed's served set collapsed from
-2967 nodes to 158, and DNS answers fell to 1&ndash;2 addresses.</p>
+2967 nodes to 158, and DNS answers fell to 1 or 2 addresses.</p>
 
 <h3>Cause</h3>
-<p>The crawler selects nodes from a single FIFO shared with the whole SHA256d
+<p>The crawler selected nodes from a single FIFO shared with the whole SHA256d
 network. That queue held approximately 257,000 addresses while only about 400
 of them were fork nodes. A full cycle took about 2.3 hours.</p>
-<p>The seeder rates a node "good" using a decaying counter (tau = 2 hours)
-that requires more than 2 observations. That means a node must be polled at
+<p>The seeder rated a node "good" using a decaying counter (tau = 2 hours)
+that required more than 2 observations. That means a node had to be polled at
 least every tau*ln2 = 83 minutes to stay rated. At a 2.3 hour cycle, fork
 nodes decayed out of the served set while still being perfectly reachable.</p>
 
 <h3>Fix</h3>
 <p>A second rotation queue was added for nodes confirmed to advertise
-<code>NODE_BLAKE2B</code>, given a fixed 5% share of crawl picks. Enrolment
-requires a successful handshake, so gossip-advertised service bits alone do
-not qualify a node.</p>
-
-<h3>Result</h3>
-<p>Fork nodes polled within the 83-minute window went from 46 of 396 to 291 of
-379, and DNS answers returned to a full packet.</p>
-<p>The fix is in the public repository linked above.</p>
+<code>NODE_BLAKE2B</code>, given a fixed 5% share of crawl picks. Fork nodes
+polled within the 83-minute window went from 46 of 396 to 291 of 379, and DNS
+answers returned to a full packet. That patch is still public at
+<a href="https://github.com/LionThunderFingers/BTC-blake2b-seeder">https://github.com/LionThunderFingers/BTC-blake2b-seeder</a>.
+LionSeed was then written so this kind of starvation cannot happen by
+design.</p>
 
 <h2>Policy compliance</h2>
 <p>Against <code>doc/dnsseed-policy.md</code>:</p>
 <ul>
   <li>Results are crawled live. They are not biased or filtered per
   requester.</li>
-  <li>Each answer is a randomly selected subset of the currently-good set, so
+  <li>Each answer is a randomly selected subset of the currently good set, so
   two queries will usually differ. No requester or group of requesters is
   singled out to receive different results.</li>
-  <li>TTL is 3600 seconds, comfortably above the 60s minimum.</li>
-  <li>DNS query logs are not retained or shared. Only operational crawl data
-  is kept.</li>
-  <li>Crawl data &mdash; which nodes were reachable &mdash; may be published.
-  It is not made more complete by biasing connectivity.</li>
+  <li>TTL is 60 seconds, the minimum the policy asks for.</li>
+  <li>DNS queries are not logged at all. The only per-requester state is a
+  short-lived in-memory counter used for rate limiting, which is never written
+  to disk.</li>
+  <li>Crawl data, meaning which nodes were reachable and when, is published
+  through the <a href="../">census</a> (point 5). It is not made more complete
+  by biasing connectivity.</li>
   <li>A contact address is published here, and is also in the zone's SOA
   RNAME.</li>
 </ul>
 <p>No compliance is claimed beyond the points listed above.</p>
 
 <footer>
-  <p>Last updated 2026-09-21.</p>
+  <p>Last updated 2026-09-28.</p>
   <p>Contact: <a href="mailto:knots.seed@gmail.com">knots.seed@gmail.com</a></p>
 </footer>
 

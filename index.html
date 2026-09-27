@@ -167,19 +167,32 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
   <div id="err"></div>
 
   <div class="scope">
+    <span class="k">Crawler change</span>
+    <p><strong>On 27 Sep 2026 at 21:28 UTC the seed switched to new crawler software,
+       <a href="https://github.com/LionThunderFingers/LionSeed" style="color:inherit">LionSeed</a>.</strong>
+       Figures from the 21:43 UTC sample onward come from the new crawler. It started with a
+       shorter history than the old one, so the counts stepped down at the switch and will
+       rebuild over roughly two days. That drop is the change of crawler, not nodes leaving
+       the network. The new crawler also reaches Tor and I2P nodes, so from that point the
+       fork counts include them. The stable nodes list below restarted its observation
+       period at the switch as well.</p>
+  </div>
+
+  <div class="scope">
     <span class="k">Scope</span>
     <p><strong>Two limits, both of which make these numbers a lower bound.</strong>
-       First, a crawler only sees nodes that accept incoming connections &mdash; anything behind
+       First, a crawler only sees nodes that accept incoming connections. Anything behind
        NAT that never listens is invisible to it. Second, &ldquo;rated good&rdquo; is the
-       seeder&rsquo;s own quality gate (port, services, protocol version, reported height and
-       sustained uptime), <strong>not</strong> a live reachability test: a spot check found
-       most nodes it rates as not-good still accept connections. Treat the good count as
-       &ldquo;confidently serveable&rdquo;, not as &ldquo;how many nodes are up&rdquo;.</p>
+       seeder&rsquo;s own quality gate: the node answered a handshake in the last hour, on the
+       right port, with the right services and height, and has a solid uptime record. A node
+       that is up but new to the crawler, or that dropped out recently, is not counted yet.
+       Treat the good count as &ldquo;confidently serveable&rdquo;, not as &ldquo;every node
+       that is up&rdquo;.</p>
   </div>
 
   <div class="figures">
     <div class="fig lead"><div class="v num" id="figUp">&mdash;</div>
-      <div class="k">fork nodes rated good</div><div class="note">by the seeder own quality gate</div></div>
+      <div class="k">fork nodes rated good</div><div class="note">by the seeder&rsquo;s own quality gate</div></div>
     <div class="fig"><div class="v num" id="figB2">&mdash;</div>
       <div class="k">advertise the fork bit</div><div class="note">seen by the crawler</div></div>
     <div class="fig"><div class="v num" id="figCrawl">&mdash;</div>
@@ -318,8 +331,8 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
     <div class="scope" style="margin-top:0">
       <span class="k">Read first</span>
       <p><strong>This is evidence to curate from, not a list to serve unexamined.</strong>
-         A curated seed is resistant to Sybil attacks precisely because a human chooses it
-         — an attacker cannot get in by running nodes. Serving this list verbatim would hand
+         A curated seed is resistant to Sybil attacks precisely because a human chooses it.
+         An attacker cannot get in by running nodes. Serving this list verbatim would hand
          that property away, because anything that keeps its uptime high ends up here
          automatically. Use it to inform your judgement, not to replace it.</p>
     </div>
@@ -349,7 +362,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
       published above in aggregate, but tying a specific address to a specific version on a
       network this small would be an inventory of who runs what. Full machine-readable list:
       <a href="stable-nodes.json" style="color:var(--signal)">stable-nodes.json</a>.
-      Longer windows read low while the crawler is young — they are averages that start
+      Longer windows read low while the crawler is young. They are averages that start
       empty and fill as it runs, which is why the qualifying window widens over time
       rather than being fixed at 30 days from day one.
     </p>
@@ -362,14 +375,17 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
           recording the services, block height and software it reports. Nothing here is
           second-hand.</li>
       <li>Fork nodes are identified by service bit 28
-          (<span class="num">0x10000000</span>, <span class="num">NODE_BLAKE2B</span>).</li>
+          (<span class="num">0x10000000</span>, <span class="num">NODE_BLAKE2B</span>), taken
+          only from the node&rsquo;s own handshake, never from addresses gossiped by other
+          peers.</li>
+      <li>Clearnet, Tor and I2P nodes are all crawled (Tor and I2P since 27 Sep 2026).</li>
       <li>A node reporting the fork bit while running software with no BLAKE2b support is
           still counted, but flagged, since it is either misconfigured or misreporting.</li>
-      <li><strong>&ldquo;Rated good&rdquo; is not a liveness check.</strong> It is the seeder&rsquo;s
-          internal gate, combining correct port, advertised services, protocol version, reported
-          block height and sustained uptime history. A node can be perfectly reachable and still
-          not clear it &mdash; sampling 15 nodes rated not-good, 12 accepted connections. The
-          count is deliberately conservative, and the honest reading is
+      <li><strong>&ldquo;Rated good&rdquo; is conservative.</strong> It is the seeder&rsquo;s
+          internal gate: a handshake within the last hour, correct port, advertised services,
+          protocol version, reported block height and a sustained uptime history. Fork nodes
+          are re-checked every 15 minutes. A node can be reachable and still not clear it yet,
+          for example if the crawler has only just found it, so the honest reading is
           &ldquo;at least this many&rdquo;.</li>
       <li>Regenerated hourly. The timestamp above is when the figures were taken, not when
           you opened the page.</li>
@@ -379,7 +395,8 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
   <footer>
     <span>Source: seed.thelionpool.org</span>
     <span>Contact: knots.seed@gmail.com</span>
-    <span><a href="https://github.com/LionThunderFingers/BTC-blake2b-seeder" style="color:inherit">Run your own seed</a></span>
+    <span><a href="https://github.com/LionThunderFingers/LionSeed" style="color:inherit">Run your own seed</a></span>
+    <span><a href="seed/" style="color:inherit">How the seed is operated</a></span>
   </footer>
 </div>
 
@@ -446,8 +463,8 @@ function render(d) {
     const isRc = /rc\d/i.test(name);
     const isOdd = !/Knots/i.test(name);
     const cls = isOdd ? "odd" : isRc ? "rc" : "";
-    const tag = isOdd ? "  — not Knots, but claims the fork bit"
-              : isRc ? "  — release candidate" : "";
+    const tag = isOdd ? "  (not Knots, but claims the fork bit)"
+              : isRc ? "  (release candidate)" : "";
     return `<div class="bar-row ${cls}">
       <span class="bar-label">${esc(name)}${tag}</span>
       <span class="bar-val">${n}</span>
@@ -505,7 +522,7 @@ function renderHeights(d) {
       (eb === 0 ? ", and neither is any enforcing node" : "") +
       ". Read that narrowly. It is the absence of a signal in one crawler's snapshot, built " +
       "from heights each node reported at its last handshake, and it is not proof that " +
-      "consensus is safe — a split can exist among nodes this crawler never reached, or " +
+      "consensus is safe. A split can exist among nodes this crawler never reached, or " +
       "appear later. A real one would show as a persistent cluster in the bottom row across " +
       "several updates.";
   } else {
@@ -540,7 +557,7 @@ function renderShareTiles(d) {
       ? "The reachable-node share is not available in this sample. "
       : pctStr(shareReach) + " of the nodes rated good are fork nodes. ") +
     "The crawler bootstraps from fork seeds, so this is not an unbiased sample of the " +
-    "whole Bitcoin network — it overstates the fork's share of it.";
+    "whole Bitcoin network. It overstates the fork's share of it.";
 
   const fresh = pctOf(d.b2b_polled_recently, d.b2b);
   const med = numOr(d.b2b_poll_age_median, null);
