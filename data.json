@@ -10,10 +10,7 @@
  "dump_ts": 1790764498,
  "enforcing_versions": [
   "/Satoshi:29.4.2/Knots:20260508/",
-  "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/",
-  "/Satoshi:29.4.2(Undersector XBT)/Knots:20260508/",
-  "/Satoshi:29.4.2/Knots:20260508rc2/",
-  "/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/"
+  "/Satoshi:29.4.2/Knots:20260508rc2/"
  ],
  "heights": {
   "behind": 1,
@@ -25,14 +22,14 @@
   "enforcing": {
    "behind": 0,
    "day": 1,
-   "near": 196,
-   "tip": 545
+   "near": 198,
+   "tip": 558
   },
   "not_enforcing": {
    "behind": 1,
    "day": 0,
-   "near": 51,
-   "tip": 116
+   "near": 49,
+   "tip": 103
   }
  },
  "heights_by_version": {
