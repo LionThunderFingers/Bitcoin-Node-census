@@ -1,13 +1,13 @@
 {
  "activation_end_height": 979920,
  "activation_height": 973440,
- "b2b": 1427,
- "b2b_poll_age_max": 273987,
- "b2b_poll_age_median": 1177,
- "b2b_poll_age_p90": 2855,
- "b2b_polled_recently": 1298,
- "b2b_reachable": 919,
- "dump_ts": 1790807779,
+ "b2b": 1442,
+ "b2b_poll_age_max": 277587,
+ "b2b_poll_age_median": 1175,
+ "b2b_poll_age_p90": 3256,
+ "b2b_polled_recently": 1309,
+ "b2b_reachable": 918,
+ "dump_ts": 1790811387,
  "enforcing_versions": [
   "/Satoshi:29.4.2/Knots:20260508/",
   "/Satoshi:29.4.2/Knots:20260508rc2/"
@@ -15,65 +15,71 @@
  "heights": {
   "behind": 0,
   "day": 0,
-  "near": 373,
-  "tip": 546
+  "near": 16,
+  "tip": 902
  },
  "heights_by_enforcement": {
   "enforcing": {
    "behind": 0,
    "day": 0,
-   "near": 308,
-   "tip": 460
+   "near": 15,
+   "tip": 751
   },
   "not_enforcing": {
    "behind": 0,
    "day": 0,
-   "near": 65,
-   "tip": 86
+   "near": 1,
+   "tip": 151
   }
  },
  "heights_by_version": {
   "/GrayersDad:08.30.2026=BLAKE2b/": {
    "behind": 0,
    "day": 0,
-   "near": 0,
-   "tip": 1
+   "near": 1,
+   "tip": 0
   },
   "/OracleKnots:29.4.2(Forever Money)/OracleKnots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 2
+   "near": 0,
+   "tip": 3
   },
   "/OracleKnots:29.4.2/OracleKnots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 2,
-   "tip": 0
+   "near": 0,
+   "tip": 2
+  },
+  "/Satoshi:29.4.1()/Knots:20260508/": {
+   "behind": 0,
+   "day": 0,
+   "near": 0,
+   "tip": 1
   },
   "/Satoshi:29.4.1(BIP110-RDTS)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 0
+   "near": 0,
+   "tip": 1
   },
   "/Satoshi:29.4.1/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 32,
-   "tip": 55
+   "near": 0,
+   "tip": 87
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
    "behind": 0,
    "day": 0,
-   "near": 25,
-   "tip": 22
+   "near": 0,
+   "tip": 47
   },
   "/Satoshi:29.4.1/Knots:20260508rc5/": {
    "behind": 0,
    "day": 0,
-   "near": 4,
-   "tip": 6
+   "near": 0,
+   "tip": 10
   },
   "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/": {
    "behind": 0,
@@ -84,14 +90,14 @@
   "/Satoshi:29.4.2(BIP110)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 1
+   "near": 0,
+   "tip": 2
   },
   "/Satoshi:29.4.2(BIP110)/Knots:20260508rc2/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 1
+   "near": 0,
+   "tip": 2
   },
   "/Satoshi:29.4.2(Bitcoin-is-money)/Knots:20260508/": {
    "behind": 0,
@@ -102,8 +108,8 @@
   "/Satoshi:29.4.2(KUDUHODL-KNOTS)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 0
+   "near": 0,
+   "tip": 1
   },
   "/Satoshi:29.4.2(Kilombino)/Knots:20260508/": {
    "behind": 0,
@@ -126,8 +132,8 @@
   "/Satoshi:29.4.2(anon)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 0
+   "near": 0,
+   "tip": 1
   },
   "/Satoshi:29.4.2(filteroor)/Knots:20260508rc2/": {
    "behind": 0,
@@ -150,34 +156,34 @@
   "/Satoshi:29.4.2(true bitcoin)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 0
+   "near": 0,
+   "tip": 1
   },
   "/Satoshi:29.4.2/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 287,
-   "tip": 426
+   "near": 15,
+   "tip": 696
   },
   "/Satoshi:29.4.2/Knots:20260508rc2/": {
    "behind": 0,
    "day": 0,
-   "near": 16,
-   "tip": 20
+   "near": 0,
+   "tip": 36
   }
  },
- "max_height": 974918,
- "reachable": 919,
- "total": 200938,
- "ts": 1790808446,
+ "max_height": 974923,
+ "reachable": 918,
+ "total": 200157,
+ "ts": 1790812046,
  "versions": {
   "/GrayersDad:08.30.2026=BLAKE2b/": 1,
   "/OracleKnots:29.4.2(Forever Money)/OracleKnots:20260508/": 3,
   "/OracleKnots:29.4.2/OracleKnots:20260508/": 2,
-  "/Satoshi:29.4.1/Knots:20260508/": 88,
+  "/Satoshi:29.4.1/Knots:20260508/": 89,
   "/Satoshi:29.4.1/Knots:20260508rc4/": 47,
   "/Satoshi:29.4.1/Knots:20260508rc5/": 10,
-  "/Satoshi:29.4.2/Knots:20260508/": 727,
+  "/Satoshi:29.4.2/Knots:20260508/": 725,
   "/Satoshi:29.4.2/Knots:20260508rc2/": 41
  }
 }
