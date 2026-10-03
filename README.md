@@ -1,6 +1,6 @@
 # B2B Node Census
 
-Hourly census of the **reachable** Bitcoin Knots BLAKE2b network, measured by crawling it from an independent DNS seed (`seed.thelionpool.org`).
+Hourly census of the **reachable** Bitcoin network, measured by crawling it from an independent DNS seed (`seed.thelionpool.org`).
 
 Live page: https://lionthunderfingers.github.io/B2B-Node-census/
 
