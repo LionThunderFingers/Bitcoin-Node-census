@@ -206,7 +206,7 @@ footer p {
 
 <header>
   <h1>seed.thelionpool.org</h1>
-  <p class="lede">A DNS seed for the Bitcoin Knots hardfork. This page
+  <p class="lede">A DNS seed for post-fork Bitcoin Knots nodes. This page
   documents how the seed is operated, as encouraged by point 6 of
   <code>doc/dnsseed-policy.md</code>.</p>
   <p class="updated">Last updated 2026-09-28</p>
@@ -231,7 +231,7 @@ footer p {
 <h2>What it serves</h2>
 <dl>
   <dt>Network</dt>
-  <dd>The Bitcoin Knots hardfork. Fork height 961640.</dd>
+  <dd>Bitcoin Knots, post-fork. Fork height 961640.</dd>
   <dt>Software</dt>
   <dd>LionSeed, a DNS seeder written from scratch for the Bitcoin network
   (Rust, MIT licence). It is a live crawler, not a static host list. It crawls
@@ -251,17 +251,17 @@ footer p {
   external alerting.</dd>
 </dl>
 
-<h2>Only fork nodes, under any query</h2>
+<h2>Only post-fork nodes, under any query</h2>
 <p>Every service-bit filter of the form <code>x&lt;hex&gt;</code> is accepted,
 for example <code>x10000009</code> (<code>NODE_NETWORK|NODE_WITNESS|NODE_BLAKE2B</code>)
 or <code>x9</code>. A bare hostname query uses <code>x9</code>.</p>
 <p>Whatever the filter, the only nodes that can ever appear in an answer are
-nodes this seed has itself confirmed to be on the fork. So a bare or
-<code>x9</code> query never returns a non-fork node. This is a deliberate
+nodes this seed has itself confirmed to be post-fork. So a bare or
+<code>x9</code> query never returns a pre-fork node. This is a deliberate
 deviation from stock seeder behaviour.</p>
-<p>The reason: the fork shares port 8333 with the much larger SHA256d network.
+<p>The reason: post-fork nodes share port 8333 with the much larger SHA256d network.
 An unfiltered answer would be composed mostly of peers that are useless to a
-fork node.</p>
+post-fork node.</p>
 
 <h2>How nodes are chosen</h2>
 <p>A node is served only when all of these hold:</p>
@@ -271,7 +271,7 @@ fork node.</p>
   Service bits gossiped by other peers are never trusted on their own.</li>
   <li>It reported a height of at least 961640 and advertises
   <code>NODE_NETWORK</code>.</li>
-  <li>It answered a handshake within the last hour. Fork nodes are re-checked
+  <li>It answered a handshake within the last hour. Post-fork nodes are re-checked
   every 15 minutes, so a node that goes away drops out of answers quickly.</li>
   <li>It has a good reliability record over recent checks.</li>
 </ul>
@@ -281,7 +281,7 @@ answer. DNS answers carry clearnet addresses only. Tor and I2P nodes are
 crawled for the census and the crawl data, since DNS cannot carry those
 addresses.</p>
 <p>The seed does not filter by user agent or node version. Any node that
-follows the fork's consensus rules is treated the same.</p>
+follows the post-fork consensus rules is treated the same.</p>
 
 <h2>How to use it</h2>
 <p>Query the seed directly:</p>
@@ -299,7 +299,7 @@ figures.</p>
   <thead>
     <tr>
       <th scope="col"></th>
-      <th scope="col">Fork nodes</th>
+      <th scope="col">Post-fork nodes</th>
       <th scope="col">Rated good</th>
     </tr>
   </thead>
@@ -335,9 +335,9 @@ answer: 24, a full 512-byte UDP response.</p>
 <code>sipa/bitcoin-seeder</code>. On 2026-09-27 at 21:28 UTC it was replaced
 by LionSeed. The seed hostname, nameserver and IP address did not change.</p>
 <p>The reason was the incident below. The old crawler worked through one queue
-shared with the whole SHA256d network, and the fork nodes kept getting
-starved. LionSeed schedules each node by what it already knows about it: fork
-nodes every 15 minutes, new addresses as soon as possible, non-fork nodes once
+shared with the whole SHA256d network, and the post-fork nodes kept getting
+starved. LionSeed schedules each node by what it already knows about it: post-fork
+nodes every 15 minutes, new addresses as soon as possible, pre-fork nodes once
 a day. It also crawls Tor and I2P, which the old seeder could not.</p>
 
 <h2>Incident: served set collapse, 2026-09-20</h2>
@@ -348,15 +348,15 @@ a day. It also crawls Tor and I2P, which the old seeder could not.</p>
 <h3>Cause</h3>
 <p>The crawler selected nodes from a single FIFO shared with the whole SHA256d
 network. That queue held approximately 257,000 addresses while only about 400
-of them were fork nodes. A full cycle took about 2.3 hours.</p>
+of them were post-fork nodes. A full cycle took about 2.3 hours.</p>
 <p>The seeder rated a node "good" using a decaying counter (tau = 2 hours)
 that required more than 2 observations. That means a node had to be polled at
-least every tau*ln2 = 83 minutes to stay rated. At a 2.3 hour cycle, fork
+least every tau*ln2 = 83 minutes to stay rated. At a 2.3 hour cycle, post-fork
 nodes decayed out of the served set while still being perfectly reachable.</p>
 
 <h3>Fix</h3>
 <p>A second rotation queue was added for nodes confirmed to advertise
-<code>NODE_BLAKE2B</code>, given a fixed 5% share of crawl picks. Fork nodes
+<code>NODE_BLAKE2B</code>, given a fixed 5% share of crawl picks. Post-fork nodes
 polled within the 83-minute window went from 46 of 396 to 291 of 379, and DNS
 answers returned to a full packet. That fix shipped in the predecessor seeder
 (since retired in favour of LionSeed), which was then written so this kind of

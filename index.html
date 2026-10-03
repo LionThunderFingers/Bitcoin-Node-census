@@ -155,7 +155,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
 
   <header class="masthead">
     <div>
-      <div class="eyebrow">Bitcoin Knots &middot; fork network</div>
+      <div class="eyebrow">Bitcoin Knots &middot; post-fork network</div>
       <h1>Reachable node census</h1>
       <p>Measured by crawling the network from <a href="seed/" class="num" style="color:inherit">seed.thelionpool.org</a>,
          an independent DNS seed (<a href="seed/" style="color:inherit">how the seed is operated</a>). Every node counted here was connected to directly and
@@ -174,7 +174,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
        shorter history than the old one, so the counts stepped down at the switch and will
        rebuild over roughly two days. That drop is the change of crawler, not nodes leaving
        the network. The new crawler also reaches Tor and I2P nodes, so from that point the
-       fork counts include them. The stable nodes list below restarted its observation
+       post-fork counts include them. The stable nodes list below restarted its observation
        period at the switch as well.</p>
   </div>
 
@@ -192,21 +192,21 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
 
   <div class="figures">
     <div class="fig lead"><div class="v num" id="figUp">&mdash;</div>
-      <div class="k">fork nodes rated good</div><div class="note">by the seeder&rsquo;s own quality gate</div></div>
+      <div class="k">post-fork nodes rated good</div><div class="note">by the seeder&rsquo;s own quality gate</div></div>
     <div class="fig"><div class="v num" id="figB2">&mdash;</div>
-      <div class="k">advertise the fork bit</div><div class="note">seen by the crawler</div></div>
+      <div class="k">advertise the post-fork bit</div><div class="note">seen by the crawler</div></div>
     <div class="fig"><div class="v num" id="figCrawl">&mdash;</div>
       <div class="k">nodes crawled overall</div><div class="note">both chains share port 8333</div></div>
     <div class="fig"><div class="v num" id="figTip">&mdash;</div>
-      <div class="k">highest block seen</div><div class="note">across fork nodes</div></div>
+      <div class="k">highest block seen</div><div class="note">across post-fork nodes</div></div>
   </div>
 
   <div class="figures" style="margin-top:1px">
     <div class="fig"><div class="v num" id="figShare">&mdash;</div>
-      <div class="k" id="figShareK">of crawled nodes advertise the fork bit</div>
+      <div class="k" id="figShareK">of crawled nodes advertise the post-fork bit</div>
       <div class="note" id="figShareNote">&mdash;</div></div>
     <div class="fig"><div class="v num" id="figFresh">&mdash;</div>
-      <div class="k" id="figFreshK">of fork nodes were polled recently</div>
+      <div class="k" id="figFreshK">of post-fork nodes were polled recently</div>
       <div class="note" id="figFreshNote">&mdash;</div></div>
   </div>
 
@@ -232,7 +232,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
       </div>
       <div>
         <div class="big num" id="cdReady">&mdash;</div>
-        <div class="lbl" id="cdReadyLbl">of reachable fork nodes on a release containing it</div>
+        <div class="lbl" id="cdReadyLbl">of reachable post-fork nodes on a release containing it</div>
         <div class="sub" id="cdReadySub" hidden></div>
       </div>
     </div>
@@ -247,10 +247,10 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
     </div>
 
     <div class="act-block" id="actRisk" hidden>
-      <h3>Reachable fork nodes not on an enforcing release</h3>
+      <h3>Reachable post-fork nodes not on an enforcing release</h3>
       <div class="ne-head">
         <span class="big num" id="neCount">&mdash;</span>
-        <span class="lbl" id="neCountLbl">of the reachable fork nodes counted</span>
+        <span class="lbl" id="neCountLbl">of the reachable post-fork nodes counted</span>
       </div>
       <div class="bars ne-list" id="neList"></div>
       <p class="ne-note" id="neNote"></p>
@@ -260,7 +260,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
   <section id="adoptionSection" hidden>
     <div class="sec-head">
       <h2>How fast the enforcing release was adopted</h2>
-      <p>Share of reachable fork nodes running a release that contains the consensus rule,
+      <p>Share of reachable post-fork nodes running a release that contains the consensus rule,
          sampled by this crawler roughly once an hour. Raw samples, not smoothed.</p>
     </div>
     <div class="panel">
@@ -276,7 +276,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
           <thead><tr>
             <th scope="col">Sample time (UTC)</th>
             <th scope="col" style="text-align:right">Enforcing</th>
-            <th scope="col" style="text-align:right">Reachable fork nodes</th>
+            <th scope="col" style="text-align:right">Reachable post-fork nodes</th>
             <th scope="col" style="text-align:right">Share</th>
           </tr></thead>
           <tbody id="adoptRows"></tbody>
@@ -288,7 +288,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
 
   <section>
     <div class="sec-head">
-      <h2>Software in use on the fork</h2>
+      <h2>Software in use post-fork</h2>
       <p>This is the number that matters before a consensus change. A node only enforces a
          new rule if it is running code that contains it.</p>
     </div>
@@ -299,7 +299,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
     <div class="sec-head">
       <h2>Are nodes agreeing on the chain?</h2>
       <p>Each node reports its block height during the handshake. A cluster stuck well behind
-         the rest is the first visible sign of a chain split &mdash; so the fork nodes are
+         the rest is the first visible sign of a chain split &mdash; so the post-fork nodes are
          split here into those on an enforcing release and those not, to show whether the
          two groups are drifting apart.</p>
     </div>
@@ -324,7 +324,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
     <div class="sec-head">
       <h2>Stable nodes list, for fixed-seed runners</h2>
       <p>If you run a <strong>curated, fixed-list</strong> seed rather than a crawler, the hard
-         part is knowing which nodes are actually reliable. This is that evidence: fork nodes
+         part is knowing which nodes are actually reliable. This is that evidence: post-fork nodes
          this crawler has found consistently reachable, with the figures behind the claim.</p>
     </div>
 
@@ -341,7 +341,7 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
       <div class="fig lead"><div class="v num" id="stQual">&mdash;</div>
         <div class="k">nodes meet the bar</div><div class="note" id="stCrit">&mdash;</div></div>
       <div class="fig"><div class="v num" id="stSeen">&mdash;</div>
-        <div class="k">fork nodes assessed</div><div class="note">those the seeder rates good</div></div>
+        <div class="k">post-fork nodes assessed</div><div class="note">those the seeder rates good</div></div>
       <div class="fig"><div class="v num" id="stAge">&mdash;</div>
         <div class="k">days of observation</div><div class="note">longer means a stronger list</div></div>
     </div>
@@ -374,16 +374,16 @@ details.dt>summary{cursor:pointer;font-family:var(--mono);font-size:12px;color:v
       <li>A crawler connects to each node on port 8333 and completes a Bitcoin handshake,
           recording the services, block height and software it reports. Nothing here is
           second-hand.</li>
-      <li>Fork nodes are identified by service bit 28
+      <li>Post-fork nodes are identified by service bit 28
           (<span class="num">0x10000000</span>, <span class="num">NODE_BLAKE2B</span>), taken
           only from the node&rsquo;s own handshake, never from addresses gossiped by other
           peers.</li>
       <li>Clearnet, Tor and I2P nodes are all crawled (Tor and I2P since 27 Sep 2026).</li>
-      <li>A node reporting the fork bit while running software with no BLAKE2b support is
+      <li>A node reporting the post-fork bit while running software with no BLAKE2b support is
           still counted, but flagged, since it is either misconfigured or misreporting.</li>
       <li><strong>&ldquo;Rated good&rdquo; is conservative.</strong> It is the seeder&rsquo;s
           internal gate: a handshake within the last hour, correct port, advertised services,
-          protocol version, reported block height and a sustained uptime history. Fork nodes
+          protocol version, reported block height and a sustained uptime history. Post-fork nodes
           are re-checked every 15 minutes. A node can be reachable and still not clear it yet,
           for example if the crawler has only just found it, so the honest reading is
           &ldquo;at least this many&rdquo;.</li>
@@ -463,7 +463,7 @@ function render(d) {
     const isRc = /rc\d/i.test(name);
     const isOdd = !/Knots/i.test(name);
     const cls = isOdd ? "odd" : isRc ? "rc" : "";
-    const tag = isOdd ? "  (not Knots, but claims the fork bit)"
+    const tag = isOdd ? "  (not Knots, but claims the post-fork bit)"
               : isRc ? "  (release candidate)" : "";
     return `<div class="bar-row ${cls}">
       <span class="bar-label">${esc(name)}${tag}</span>
@@ -512,7 +512,7 @@ function renderHeights(d) {
   if (!hbe) {
     msg = "This sample does not publish the height breakdown split by enforcement status, " +
       "so the two groups cannot be compared from it. The figures above are the aggregate " +
-      "over every fork node, as before.";
+      "over every post-fork node, as before.";
   } else if (nb === null) {
     msg = "The non-enforcing group has no height breakdown in this sample, so no comparison " +
       "between the two groups can be drawn from it. Read the aggregate column only.";
@@ -536,7 +536,7 @@ function renderHeights(d) {
   $("divergeNote").textContent = msg;
 }
 
-// ---- Two context tiles: fork share of the crawl, and measurement freshness ----
+// ---- Two context tiles: post-fork share of the crawl, and measurement freshness ----
 const POLL_FRESH_SECONDS = 4980;
 function pctOf(a, b) {
   const x = numOr(a, null), y = numOr(b, null);
@@ -555,9 +555,9 @@ function renderShareTiles(d) {
   $("figShareNote").textContent =
     (shareReach === null
       ? "The reachable-node share is not available in this sample. "
-      : pctStr(shareReach) + " of the nodes rated good are fork nodes. ") +
-    "The crawler bootstraps from fork seeds, so this is not an unbiased sample of the " +
-    "whole Bitcoin network. It overstates the fork's share of it.";
+      : pctStr(shareReach) + " of the nodes rated good are post-fork nodes. ") +
+    "The crawler bootstraps from post-fork seeds, so this is not an unbiased sample of the " +
+    "whole Bitcoin network. It overstates the post-fork share of it.";
 
   const fresh = pctOf(d.b2b_polled_recently, d.b2b);
   const med = numOr(d.b2b_poll_age_median, null);
@@ -602,7 +602,7 @@ function renderActivation(d, entries, enforcing) {
     risk.hidden = true;
     setTile("cdBlocks", DASH, "blocks remaining", "");
     setTile("cdDays", DASH, "days, at ~10 min/block", "");
-    setTile("cdReady", DASH, "of reachable fork nodes on a release containing it", "");
+    setTile("cdReady", DASH, "of reachable post-fork nodes on a release containing it", "");
     return;
   }
 
@@ -612,8 +612,8 @@ function renderActivation(d, entries, enforcing) {
     .reduce((a, [, n]) => a + n, 0);
   const pct = reach > 0 ? Math.round(ready / reach * 100) + "%" : DASH;
   const pctSub = reach > 0
-    ? fmt(ready) + " of " + fmt(reach) + " reachable fork nodes"
-    : "no reachable fork nodes counted";
+    ? fmt(ready) + " of " + fmt(reach) + " reachable post-fork nodes"
+    : "no reachable post-fork nodes counted";
 
   // ---------------- STATE A: not yet activated ----------------
   if (tip < act) {
@@ -625,7 +625,7 @@ function renderActivation(d, entries, enforcing) {
     const remaining = act - tip;
     setTile("cdBlocks", fmt(remaining), "blocks remaining", "");
     setTile("cdDays", days(remaining), "days, at ~10 min/block", "");
-    setTile("cdReady", pct, "of reachable fork nodes on a release containing it", pctSub);
+    setTile("cdReady", pct, "of reachable post-fork nodes on a release containing it", pctSub);
     return;
   }
 
@@ -665,7 +665,7 @@ function renderActivation(d, entries, enforcing) {
       "about " + days(toRelease) + " days, at ~10 min/block");
   }
 
-  setTile("cdReady", pct, "of reachable fork nodes on a release containing it", pctSub);
+  setTile("cdReady", pct, "of reachable post-fork nodes on a release containing it", pctSub);
 
   // ---- progress through the window ----
   if (span > 0) {
@@ -695,8 +695,8 @@ function renderActivation(d, entries, enforcing) {
   const headline = clamp(reach - ready, 0, Number.MAX_SAFE_INTEGER);
   $("neCount").textContent = reach > 0 ? fmt(headline) : DASH;
   $("neCountLbl").textContent = reach > 0
-    ? "of " + fmt(reach) + " reachable fork nodes are not on a release containing the rule"
-    : "no reachable fork nodes counted, so there is nothing to measure against";
+    ? "of " + fmt(reach) + " reachable post-fork nodes are not on a release containing the rule"
+    : "no reachable post-fork nodes counted, so there is nothing to measure against";
 
   const rows = nonEnf.slice();
   const unrecorded = headline - listed;
@@ -714,8 +714,8 @@ function renderActivation(d, entries, enforcing) {
           (n / rowMax * 100).toFixed(1) + '%"></span></span></div>';
       }).join("")
     : '<p class="ne-note" style="margin-top:0">' + (reach > 0
-        ? "Every reachable fork node the crawler identified is on a release containing the rule."
-        : "No reachable fork node was counted this crawl, so there is nothing to break down.") +
+        ? "Every reachable post-fork node the crawler identified is on a release containing the rule."
+        : "No reachable post-fork node was counted this crawl, so there is nothing to break down.") +
       "</p>";
 
   $("neNote").textContent = unrecorded > 0
@@ -779,7 +779,7 @@ function renderHistory(h) {
     const reach = Math.max(0, numOr(raw.b2b_reachable, 0));
     const enf = Math.max(0, numOr(raw.enforcing, 0));
     const mh = numOr(raw.max_height, null);
-    // A sample with no reachable fork node has no ratio to plot. It becomes a break in
+    // A sample with no reachable post-fork node has no ratio to plot. It becomes a break in
     // the line, never a division by zero and never a fabricated zero per cent.
     let pct = null;
     if (reach > 0) {
@@ -806,15 +806,15 @@ function renderHistory(h) {
     fmt(plotted.length) + " samples over " + spanTxt + ", " + utcLabel(t0) + " to " +
     utcLabel(t1) + ". Plotted raw: no smoothing and no moving average. " +
     (gaps ? fmt(gaps) + (gaps === 1
-      ? " sample counted no reachable fork node at all and appears as a break in the line, "
-      : " samples counted no reachable fork node at all and appear as breaks in the line, ") +
+      ? " sample counted no reachable post-fork node at all and appears as a break in the line, "
+      : " samples counted no reachable post-fork node at all and appear as breaks in the line, ") +
       "not as zero per cent. " : "") +
     (clamped ? fmt(clamped) + (clamped === 1
       ? " sample reported more enforcing nodes than reachable ones and is clamped to "
       : " samples reported more enforcing nodes than reachable ones and are clamped to ") +
       "100 per cent. " : "") +
     "Read this as a lower bound measured by one crawler. The denominator is the count of " +
-    "fork nodes that accept incoming connections and currently clear the seeder's own " +
+    "post-fork nodes that accept incoming connections and currently clear the seeder's own " +
     "quality gate, and that gate decays with crawl timing, so the denominator moves on its " +
     "own. Some historical samples are also known to be truncated reads with implausibly " +
     "low totals. A dip in this line is at least as likely to be a measurement artefact as " +
@@ -832,7 +832,7 @@ function renderHistory(h) {
     ? "Showing the most recent " + fmt(shown.length) + " of " + fmt(pts.length) +
       " samples. The full series is in history.json."
     : "All " + fmt(pts.length) + " samples held by the crawler. A dash in the share " +
-      "column is a sample with no reachable fork node to divide by.";
+      "column is a sample with no reachable post-fork node to divide by.";
 
   drawAdoption();
 }
@@ -943,7 +943,7 @@ function drawAdoption() {
       (toRight ? "start" : "end") + '">' + esc(lbl) + "</text>";
   }
 
-  const aria = "Line chart. Share of reachable fork nodes on a release containing the rule: " +
+  const aria = "Line chart. Share of reachable post-fork nodes on a release containing the rule: " +
     Math.round(first.pct) + " per cent at " + utcLabel(first.ts) + ", rising to " +
     Math.round(last.pct) + " per cent at " + utcLabel(last.ts) + "." +
     (markTs ? " The rule took effect at " + utcLabel(markTs) + "." : "") +
