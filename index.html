@@ -149,6 +149,10 @@ details.dt p{margin:10px 0 0;color:var(--text-2);font-size:14px;max-width:70ch}
 details.dt p+p{margin-top:9px}
 /* Scope/notice banners: a flex header row (label + headline) with the long explanation
    collapsed below it, so the banner reads as one line until opened. */
+.scope-pair{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px}
+.scope-pair>.scope{flex:1 1 0;min-width:0;margin-top:0}
+.scope-pair .scope-row{flex-direction:column;align-items:flex-start;gap:4px}
+@media (max-width:520px){ .scope-pair{flex-direction:column} }
 .scope{margin-top:14px;background:var(--warn-bg);border-left:3px solid var(--warn);padding:13px 16px}
 .scope-row{display:flex;gap:12px;align-items:flex-start}
 .scope .k{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
@@ -166,7 +170,7 @@ details.dt p+p{margin-top:9px}
 
   <header class="masthead">
     <div>
-      <div class="eyebrow">Bitcoin Knots &middot; post-fork network</div>
+      <div class="eyebrow">Bitcoin Knots</div>
       <h1>Reachable node census</h1>
       <p>Measured by crawling the network from <a href="seed/" class="num" style="color:inherit">seed.thelionpool.org</a>,
          an independent DNS seed (<a href="seed/" style="color:inherit">how the seed is operated</a>). Every node counted here was connected to directly and
@@ -203,36 +207,38 @@ details.dt p+p{margin-top:9px}
     <section id="aboutSection">
       <div class="sec-head"><h2>About this seed</h2></div>
 
-      <div class="scope">
-        <div class="scope-row">
-          <span class="k">Crawler change</span>
-          <p><strong>On 27 Sep 2026 at 21:28 UTC the seed switched to new crawler software,
-             <a href="https://github.com/LionThunderFingers/LionSeed" style="color:inherit">LionSeed</a>.</strong></p>
+      <div class="scope-pair">
+        <div class="scope">
+          <div class="scope-row">
+            <span class="k">Crawler change</span>
+            <p><strong>On 27 Sep 2026 at 21:28 UTC the seed switched to new crawler software,
+               <a href="https://github.com/LionThunderFingers/LionSeed" style="color:inherit">LionSeed</a>.</strong></p>
+          </div>
+          <details class="dt"><summary>what is this?</summary>
+            <p>Figures from the 21:43 UTC sample onward come from the new crawler. It started with a
+               shorter history than the old one, so the counts stepped down at the switch and will
+               rebuild over roughly two days. That drop is the change of crawler, not nodes leaving
+               the network. The new crawler also reaches Tor and I2P nodes, so from that point the
+               post-fork counts include them. The stable nodes list below restarted its observation
+               period at the switch as well.</p>
+          </details>
         </div>
-        <details class="dt"><summary>what is this?</summary>
-          <p>Figures from the 21:43 UTC sample onward come from the new crawler. It started with a
-             shorter history than the old one, so the counts stepped down at the switch and will
-             rebuild over roughly two days. That drop is the change of crawler, not nodes leaving
-             the network. The new crawler also reaches Tor and I2P nodes, so from that point the
-             post-fork counts include them. The stable nodes list below restarted its observation
-             period at the switch as well.</p>
-        </details>
-      </div>
 
-      <div class="scope">
-        <div class="scope-row">
-          <span class="k">Scope</span>
-          <p><strong>Two limits, both of which make these numbers a lower bound.</strong></p>
+        <div class="scope">
+          <div class="scope-row">
+            <span class="k">Scope</span>
+            <p><strong>Two limits, both of which make these numbers a lower bound.</strong></p>
+          </div>
+          <details class="dt"><summary>what is this?</summary>
+            <p>First, a crawler only sees nodes that accept incoming connections. Anything behind
+               NAT that never listens is invisible to it. Second, &ldquo;rated good&rdquo; is the
+               seeder&rsquo;s own quality gate: the node answered a handshake in the last hour, on the
+               right port, with the right services and height, and has a solid uptime record. A node
+               that is up but new to the crawler, or that dropped out recently, is not counted yet.
+               Treat the good count as &ldquo;confidently serveable&rdquo;, not as &ldquo;every node
+               that is up&rdquo;.</p>
+          </details>
         </div>
-        <details class="dt"><summary>what is this?</summary>
-          <p>First, a crawler only sees nodes that accept incoming connections. Anything behind
-             NAT that never listens is invisible to it. Second, &ldquo;rated good&rdquo; is the
-             seeder&rsquo;s own quality gate: the node answered a handshake in the last hour, on the
-             right port, with the right services and height, and has a solid uptime record. A node
-             that is up but new to the crawler, or that dropped out recently, is not counted yet.
-             Treat the good count as &ldquo;confidently serveable&rdquo;, not as &ldquo;every node
-             that is up&rdquo;.</p>
-        </details>
       </div>
 
       <details class="dt" style="margin-top:14px">
