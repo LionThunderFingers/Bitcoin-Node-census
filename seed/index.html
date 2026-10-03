@@ -206,7 +206,7 @@ footer p {
 
 <header>
   <h1>seed.thelionpool.org</h1>
-  <p class="lede">A DNS seed for the Bitcoin Knots BLAKE2b hardfork. This page
+  <p class="lede">A DNS seed for the Bitcoin Knots hardfork. This page
   documents how the seed is operated, as encouraged by point 6 of
   <code>doc/dnsseed-policy.md</code>.</p>
   <p class="updated">Last updated 2026-09-28</p>
@@ -231,9 +231,9 @@ footer p {
 <h2>What it serves</h2>
 <dl>
   <dt>Network</dt>
-  <dd>The Bitcoin Knots BLAKE2b hardfork. Fork height 961640.</dd>
+  <dd>The Bitcoin Knots hardfork. Fork height 961640.</dd>
   <dt>Software</dt>
-  <dd>LionSeed, a DNS seeder written from scratch for the BLAKE2b network
+  <dd>LionSeed, a DNS seeder written from scratch for the Bitcoin network
   (Rust, MIT licence). It is a live crawler, not a static host list. It crawls
   clearnet, Tor v3 and I2P nodes. Source:
   <a href="https://github.com/LionThunderFingers/LionSeed">https://github.com/LionThunderFingers/LionSeed</a></dd>
@@ -358,10 +358,9 @@ nodes decayed out of the served set while still being perfectly reachable.</p>
 <p>A second rotation queue was added for nodes confirmed to advertise
 <code>NODE_BLAKE2B</code>, given a fixed 5% share of crawl picks. Fork nodes
 polled within the 83-minute window went from 46 of 396 to 291 of 379, and DNS
-answers returned to a full packet. That patch is still public at
-<a href="https://github.com/LionThunderFingers/BTC-blake2b-seeder">https://github.com/LionThunderFingers/BTC-blake2b-seeder</a>.
-LionSeed was then written so this kind of starvation cannot happen by
-design.</p>
+answers returned to a full packet. That fix shipped in the predecessor seeder
+(since retired in favour of LionSeed), which was then written so this kind of
+starvation cannot happen by design.</p>
 
 <h2>Policy compliance</h2>
 <p>Against <code>doc/dnsseed-policy.md</code>:</p>
