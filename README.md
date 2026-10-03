@@ -1,6 +1,6 @@
 # Bitcoin Node Census
 
-Hourly census of the **reachable** Bitcoin network, measured by crawling it from an independent DNS seed (`seed.thelionpool.org`).
+Hourly census of the reachable nodes on the Bitcoin network, measured by crawling it from an independent DNS seed (`seed.thelionpool.org`).
 
 Live page: https://lionthunderfingers.github.io/Bitcoin-Node-census/
 
