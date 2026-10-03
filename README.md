@@ -6,4 +6,4 @@ Live page: https://lionthunderfingers.github.io/Bitcoin-Node-census/
 
 `data.json` is regenerated hourly by the seed host and pushed here; the page reads it. Figures count only nodes that accept incoming connections, so they are a lower bound on the real network.
 
-Seeder and deploy tooling: https://github.com/LionThunderFingers/BTC-blake2b-seeder
+Seeder and deploy tooling: https://github.com/LionThunderFingers/LionSeed
