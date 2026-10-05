@@ -209,7 +209,7 @@ footer p {
   <p class="lede">A DNS seed for post-fork Bitcoin Knots nodes. This page
   documents how the seed is operated, as encouraged by point 6 of
   <code>doc/dnsseed-policy.md</code>.</p>
-  <p class="updated">Last updated 2026-09-28</p>
+  <p class="updated">Last updated 2026-10-05</p>
 </header>
 
 <div class="note">
@@ -289,78 +289,18 @@ follows the post-fork consensus rules is treated the same.</p>
 <p>Or point a node at it:</p>
 <pre><code>bitcoind -seednode=seed.thelionpool.org</code></pre>
 
-<h2>Status</h2>
-<p>The figures below are a point-in-time sample taken 2026-09-27 22:49 UTC,
-about 80 minutes after LionSeed went live. They are not live and this page
-does not update itself. See the <a href="../">census</a> for current
-figures.</p>
-<div class="table-scroll">
-<table>
-  <thead>
-    <tr>
-      <th scope="col"></th>
-      <th scope="col">Post-fork nodes</th>
-      <th scope="col">Rated good</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th scope="row">Clearnet</th>
-      <td class="num">217</td>
-      <td class="num">108</td>
-    </tr>
-    <tr>
-      <th scope="row">I2P</th>
-      <td class="num">101</td>
-      <td class="num">75</td>
-    </tr>
-    <tr>
-      <th scope="row">Tor</th>
-      <td class="num">22</td>
-      <td class="num">15</td>
-    </tr>
-    <tr>
-      <th scope="row">Total</th>
-      <td class="num">362</td>
-      <td class="num">208</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-<p>Addresses tracked across all networks: 215,276. Addresses returned per DNS
-answer: 24, a full 512-byte UDP response.</p>
+<h2>Current figures</h2>
+<p>This page describes how the seed is run and carries no numbers that change.
+Node counts and other current figures are on the <a href="../">census</a>.</p>
 
-<h2>Software change, 2026-09-27</h2>
-<p>Until 2026-09-27 this seed ran a patched fork of
-<code>sipa/bitcoin-seeder</code>. On 2026-09-27 at 21:28 UTC it was replaced
-by LionSeed. The seed hostname, nameserver and IP address did not change.</p>
-<p>The reason was the incident below. The old crawler worked through one queue
-shared with the whole SHA256d network, and the post-fork nodes kept getting
-starved. LionSeed schedules each node by what it already knows about it: post-fork
-nodes every 15 minutes, new addresses as soon as possible, pre-fork nodes once
-a day. It also crawls Tor and I2P, which the old seeder could not.</p>
-
-<h2>Incident: served set collapse, 2026-09-20</h2>
-<p>This happened on the previous software.</p>
-<p>For roughly 30 hours up to 2026-09-20 the seed's served set collapsed from
-2967 nodes to 158, and DNS answers fell to 1 or 2 addresses.</p>
-
-<h3>Cause</h3>
-<p>The crawler selected nodes from a single FIFO shared with the whole SHA256d
-network. That queue held approximately 257,000 addresses while only about 400
-of them were post-fork nodes. A full cycle took about 2.3 hours.</p>
-<p>The seeder rated a node "good" using a decaying counter (tau = 2 hours)
-that required more than 2 observations. That means a node had to be polled at
-least every tau*ln2 = 83 minutes to stay rated. At a 2.3 hour cycle, post-fork
-nodes decayed out of the served set while still being perfectly reachable.</p>
-
-<h3>Fix</h3>
-<p>A second rotation queue was added for nodes confirmed to advertise
-<code>NODE_BLAKE2B</code>, given a fixed 5% share of crawl picks. Post-fork nodes
-polled within the 83-minute window went from 46 of 396 to 291 of 379, and DNS
-answers returned to a full packet. That fix shipped in the predecessor seeder
-(since retired in favour of LionSeed), which was then written so this kind of
-starvation cannot happen by design.</p>
+<h2>Software</h2>
+<p>The seed has run LionSeed since 2026-09-27 at 21:28 UTC. Before that it ran a
+patched fork of <code>sipa/bitcoin-seeder</code>. The seed hostname, nameserver
+and IP address did not change.</p>
+<p>LionSeed re-checks post-fork nodes every 15 minutes. Addresses it has not tried
+yet come next, then addresses it tried but could not classify, retried every
+6 hours, then pre-fork nodes, checked once a day. It asks each node for
+addresses at most once a day.</p>
 
 <h2>Policy compliance</h2>
 <p>Against <code>doc/dnsseed-policy.md</code>:</p>
@@ -383,7 +323,7 @@ starvation cannot happen by design.</p>
 <p>No compliance is claimed beyond the points listed above.</p>
 
 <footer>
-  <p>Last updated 2026-09-28.</p>
+  <p>Last updated 2026-10-05.</p>
   <p>Contact: <a href="mailto:knots.seed@gmail.com">knots.seed@gmail.com</a></p>
 </footer>
 
