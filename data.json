@@ -1,29 +1,29 @@
 {
  "activation_end_height": 979920,
  "activation_height": 973440,
- "b2b": 1838,
- "b2b_poll_age_max": 1357021,
- "b2b_poll_age_median": 1081,
- "b2b_poll_age_p90": 535235,
+ "b2b": 1837,
+ "b2b_poll_age_max": 1360624,
+ "b2b_poll_age_median": 1077,
+ "b2b_poll_age_p90": 538838,
  "b2b_polled_recently": 1436,
- "b2b_reachable": 971,
- "dump_ts": 1791910562,
+ "b2b_reachable": 973,
+ "dump_ts": 1791914170,
  "enforcing_versions": [
   "/Satoshi:29.4.2/Knots:20260508/",
   "/Satoshi:29.4.2/Knots:20260508rc2/"
  ],
  "heights": {
   "behind": 0,
-  "day": 0,
-  "near": 14,
-  "tip": 957
+  "day": 1,
+  "near": 13,
+  "tip": 959
  },
  "heights_by_enforcement": {
   "enforcing": {
    "behind": 0,
-   "day": 0,
-   "near": 13,
-   "tip": 818
+   "day": 1,
+   "near": 12,
+   "tip": 820
   },
   "not_enforcing": {
    "behind": 0,
@@ -36,8 +36,8 @@
   "/GrayersDad:08.30.2026=BLAKE2b/": {
    "behind": 0,
    "day": 0,
-   "near": 0,
-   "tip": 3
+   "near": 1,
+   "tip": 2
   },
   "/Knots:29.4.2/PATUM:1.0.0(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": {
    "behind": 0,
@@ -72,8 +72,8 @@
   "/Satoshi:29.4.1/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 60
+   "near": 0,
+   "tip": 61
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
    "behind": 0,
@@ -173,9 +173,9 @@
   },
   "/Satoshi:29.4.2/Knots:20260508/": {
    "behind": 0,
-   "day": 0,
-   "near": 13,
-   "tip": 772
+   "day": 1,
+   "near": 12,
+   "tip": 775
   },
   "/Satoshi:29.4.2/Knots:20260508/Plumb:5/": {
    "behind": 0,
@@ -193,7 +193,7 @@
    "behind": 0,
    "day": 0,
    "near": 0,
-   "tip": 25
+   "tip": 24
   },
   "/Satoshi:29.4.3/Knots:20260508rc1/": {
    "behind": 0,
@@ -202,10 +202,10 @@
    "tip": 1
   }
  },
- "max_height": 977053,
- "reachable": 971,
- "total": 195898,
- "ts": 1791911052,
+ "max_height": 977055,
+ "reachable": 973,
+ "total": 197377,
+ "ts": 1791914655,
  "versions": {
   "/GrayersDad:08.30.2026=BLAKE2b/": 3,
   "/Knots:29.4.2/PATUM:1.0.0(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": 2,
@@ -214,10 +214,10 @@
   "/Satoshi:29.4.1/Knots:20260508/": 64,
   "/Satoshi:29.4.1/Knots:20260508rc4/": 46,
   "/Satoshi:29.4.1/Knots:20260508rc5/": 8,
-  "/Satoshi:29.4.2/Knots:20260508/": 803,
+  "/Satoshi:29.4.2/Knots:20260508/": 806,
   "/Satoshi:29.4.2/Knots:20260508/Plumb:5/": 1,
   "/Satoshi:29.4.2/Knots:20260508/Plumb:6/": 10,
-  "/Satoshi:29.4.2/Knots:20260508rc2/": 28,
+  "/Satoshi:29.4.2/Knots:20260508rc2/": 27,
   "/Satoshi:29.4.3/Knots:20260508rc1/": 1
  }
 }
