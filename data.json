@@ -9,8 +9,27 @@
  "b2b_reachable": 1003,
  "dump_ts": 1792325363,
  "enforcing_versions": [
+  "/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/",
+  "/Satoshi:29.4.2(BIP110)/Knots:20260508/",
+  "/Satoshi:29.4.2(BIP110)/Knots:20260508rc2/",
+  "/Satoshi:29.4.2(Bitcoin-is-money)/Knots:20260508/",
+  "/Satoshi:29.4.2(KUDUHODL-KNOTS)/Knots:20260508/",
+  "/Satoshi:29.4.2(Kilombino)/Knots:20260508/",
+  "/Satoshi:29.4.2(Nordrassil)/Knots:20260508/",
+  "/Satoshi:29.4.2(Undersector XBT)/Knots:20260508/",
+  "/Satoshi:29.4.2(XBT-NGU)/Knots:20260508/",
+  "/Satoshi:29.4.2(anon)/Knots:20260508/",
+  "/Satoshi:29.4.2(filteroor)/Knots:20260508rc2/",
+  "/Satoshi:29.4.2(mempool.guide)/Knots:20260508/",
+  "/Satoshi:29.4.2(rachmaninoff.vivaldi.net)/Knots:20260508/",
+  "/Satoshi:29.4.2(true bitcoin)/Knots:20260508/",
   "/Satoshi:29.4.2/Knots:20260508/",
-  "/Satoshi:29.4.2/Knots:20260508rc2/"
+  "/Satoshi:29.4.2/Knots:20260508/PATUM:1.0.1(https://b.pyblock.xyz:8443)/PyBLOCK Crew/",
+  "/Satoshi:29.4.2/Knots:20260508/Plumb:5/",
+  "/Satoshi:29.4.2/Knots:20260508/Plumb:6/",
+  "/Satoshi:29.4.2/Knots:20260508/Plumb:7/",
+  "/Satoshi:29.4.2/Knots:20260508rc2/",
+  "/Satoshi:29.4.3/Knots:20260508rc1/"
  ],
  "heights": {
   "behind": 0,
@@ -22,14 +41,14 @@
   "enforcing": {
    "behind": 0,
    "day": 0,
-   "near": 144,
-   "tip": 738
+   "near": 147,
+   "tip": 753
   },
   "not_enforcing": {
    "behind": 0,
    "day": 0,
-   "near": 18,
-   "tip": 103
+   "near": 15,
+   "tip": 88
   }
  },
  "heights_by_version": {
