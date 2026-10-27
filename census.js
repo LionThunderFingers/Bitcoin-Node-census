@@ -81,6 +81,7 @@ function render(d) {
 
   renderActivation(d, entries, enforcing);
   renderHeights(d);
+  renderNetworks(d);
   renderShareTiles(d);
 
   // The adoption chart needs the activation height to place its marker, but that value
@@ -88,6 +89,34 @@ function render(d) {
   // chart draws the marker only once both halves are present, in whichever order.
   ACTIVATION_HEIGHT = numOr(d.activation_height, null);
   if (ADOPT_SERIES) drawAdoption();
+}
+
+// ---- Where the reachable nodes are: clearnet vs Tor vs I2P ----
+// Only this seed publishes reachable Tor and I2P fork-node counts; most crawlers never
+// reach those networks. The field is absent in samples written before it existed, in which
+// case the whole section hides rather than rendering a misleading empty or zeroed panel.
+function renderNetworks(d) {
+  const sec = $("networksSection");
+  if (!sec) return;
+  const net = (d.networks && typeof d.networks === "object" && !Array.isArray(d.networks))
+    ? d.networks : null;
+  const rows = net ? [
+    ["Tor (v3 onion)", "tor"],
+    ["I2P", "i2p"],
+    ["IPv4 (clearnet)", "ipv4"],
+    ["IPv6 (clearnet)", "ipv6"]
+  ].map(([label, k]) => [label, numOr(net[k], 0)]) : [];
+  const total = rows.reduce((s, r) => s + r[1], 0);
+  // No field, or a field that sums to zero (nothing reachable yet): nothing to show.
+  if (!net || total <= 0) { sec.hidden = true; return; }
+  sec.hidden = false;
+  rows.sort((a, b) => b[1] - a[1]);
+  const max = Math.max(...rows.map(r => r[1]), 1);
+  $("networkBars").replaceChildren(...rows.map(([label, n]) => el("div", { class: "bar-row" },
+    el("span", { class: "bar-label" }, label),
+    el("span", { class: "bar-val" }, fmt(n) + "  ·  " + (n / total * 100).toFixed(1) + "%"),
+    el("span", { class: "bar-track" },
+      el("span", { class: "bar-fill", style: "width:" + (n / max * 100).toFixed(1) + "%" })))));
 }
 
 // ---- Are nodes agreeing on the chain? (aggregate + split by enforcement status) ----
@@ -639,11 +668,148 @@ function drawAdoption() {
   });
 }
 
+// ---- release adoption table (releases.json) ----
+// Every canonical release ever seen, with first/last seen, peak share (floored at 50 reachable)
+// and current share. All text goes through el() -> text nodes, so a hostile user-agent string
+// in a release name cannot inject markup. Absent/empty file hides the section.
+function renderReleases(r) {
+  const sec = $("releasesSection");
+  if (!sec) return;
+  if (!Array.isArray(r) || !r.length) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const CAP = 50;
+  const shown = r.slice(0, CAP);
+  const pctCount = (pct, count) => (pct == null ? DASH
+    : Math.round(numOr(pct, 0)) + "% · " + fmt(numOr(count, 0)));
+  $("releaseRows").replaceChildren(...shown.map(x => el("tr", null,
+    el("td", { style: "font-family:var(--sans);font-size:12.5px;word-break:break-all" },
+      String(x && x.ua != null ? x.ua : DASH)),
+    el("td", { class: "n" }, x && x.first_ts ? utcLabel(x.first_ts) : DASH),
+    el("td", { class: "n" }, x && x.last_ts ? utcLabel(x.last_ts) : DASH),
+    el("td", { class: "n" }, pctCount(x && x.peak_pct, x && x.peak_count)),
+    el("td", { class: "n" }, pctCount(x && x.now_pct, x && x.now_count)))));
+  $("releaseNote").textContent = r.length > CAP
+    ? "Showing the " + CAP + " of " + fmt(r.length) + " releases with the highest current " +
+      "share. Full machine-readable list: releases.json."
+    : "All " + fmt(r.length) + " releases the crawler has seen. A dash means the release was " +
+      "only ever seen in samples below the 50-node floor.";
+}
+
+// ---- policy adoption over time (policy-history.json): exclusive buckets ----
+// Reachable post-fork nodes grouped by the newest policy their software enforces, each as a
+// share of the reachable total, over time. Absent/short series hide the whole section.
+let POLICY_SERIES = null;        // {pts:[{ts,reach,buckets}], ids:[...], labels:{}}
+let POLICY_LABELS = {};
+const PC_PALETTE = ["var(--beacon)", "var(--signal)", "var(--warn)", "var(--crit)", "var(--ok)"];
+
+function pcColor(id, i, preFirst) { return id === "pre" ? "var(--text-3)" : PC_PALETTE[(i - (preFirst ? 1 : 0) + PC_PALETTE.length) % PC_PALETTE.length]; }
+function pcLabel(id) { return (POLICY_SERIES.labels && POLICY_SERIES.labels[id]) || (id === "pre" ? "Pre-fork / older" : id); }
+
+function renderPolicyHistory(h, labels) {
+  const sec = $("policyChartSection");
+  if (!sec) return;
+  if (!Array.isArray(h)) { sec.hidden = true; return; }
+  const pts = [];
+  for (const raw of h) {
+    if (!raw || typeof raw !== "object") continue;
+    const ts = numOr(raw.ts, null);
+    if (ts === null || ts <= 0) continue;
+    const reach = Math.max(0, numOr(raw.b2b_reachable, 0));
+    if (reach <= 0) continue;  // no denominator to divide by -> leave it out, never a fake 0%
+    const b = (raw.buckets && typeof raw.buckets === "object" && !Array.isArray(raw.buckets)) ? raw.buckets : {};
+    pts.push({ ts, reach, buckets: b });
+  }
+  pts.sort((a, b) => a.ts - b.ts);
+  if (pts.length < 2) { sec.hidden = true; return; }
+  const ids = [];
+  if (pts.some(p => "pre" in p.buckets)) ids.push("pre");
+  for (const p of pts) for (const k of Object.keys(p.buckets)) if (!ids.includes(k)) ids.push(k);
+  if (!ids.length) { sec.hidden = true; return; }
+  POLICY_SERIES = { pts, ids, labels: labels || {} };
+  sec.hidden = false;
+  drawPolicyChart();
+}
+
+function drawPolicyChart() {
+  const host = $("pcHost");
+  if (!host || !POLICY_SERIES || POLICY_SERIES.pts.length < 2) return;
+  const { pts, ids } = POLICY_SERIES;
+  const preFirst = ids[0] === "pre";
+  const old = host.querySelector("svg"); if (old) old.remove();
+
+  const W = Math.max(280, Math.round(numOr(host.clientWidth, 0) || 600));
+  const H = W < 430 ? 200 : W < 640 ? 225 : 250;
+  const padL = 36, padR = W < 430 ? 16 : 24, padT = 12, padB = 34;
+  const pw = Math.max(10, W - padL - padR), ph = Math.max(10, H - padT - padB);
+  const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts, spanT = (t1 - t0) || 1;
+  const n1 = v => Math.round(v * 10) / 10;
+  const X = ts => padL + (ts - t0) / spanT * pw;
+  const Y = pct => padT + (1 - clamp(pct, 0, 100) / 100) * ph;
+  const shareAt = (p, id) => {
+    const tot = Object.values(p.buckets).reduce((s, v) => s + Math.max(0, numOr(v, 0)), 0) || p.reach || 1;
+    return Math.max(0, numOr(p.buckets[id], 0)) / tot * 100;
+  };
+
+  let grid = "";
+  for (const v of [0, 25, 50, 75, 100]) {
+    grid += '<line class="ch-grid" x1="' + padL + '" y1="' + n1(Y(v)) + '" x2="' + n1(padL + pw) +
+      '" y2="' + n1(Y(v)) + '"/><text class="ch-axis" x="' + (padL - 7) + '" y="' + n1(Y(v) + 3.5) +
+      '" text-anchor="end">' + v + "%</text>";
+  }
+  const nTicks = W < 420 ? 3 : W < 640 ? 4 : 6; const seen = new Set(); let xax = "";
+  for (let k = 0; k < nTicks; k++) {
+    const i = Math.round(k * (pts.length - 1) / (nTicks - 1));
+    if (seen.has(i)) continue; seen.add(i);
+    const p = pts[i], d = new Date(p.ts * 1000);
+    const anchor = i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle";
+    xax += '<text class="ch-axis" x="' + n1(X(p.ts)) + '" y="' + (padT + ph + 15) +
+      '" text-anchor="' + anchor + '">' + esc(dayLabel(d)) + "</text>";
+  }
+  let lines = "", markers = "", legend = [];
+  ids.forEach((id, i) => {
+    const col = pcColor(id, i, preFirst);
+    let dpath = "", markTs = null;
+    for (const p of pts) {
+      dpath += (dpath ? " L" : "M") + n1(X(p.ts)) + " " + n1(Y(shareAt(p, id)));
+      if (!markTs && id !== "pre" && shareAt(p, id) > 0) markTs = p.ts;
+    }
+    const last = pts[pts.length - 1];
+    lines += '<path class="pc-line" d="' + dpath + '" style="stroke:' + col + '"/>' +
+      '<circle class="pc-dot" cx="' + n1(X(last.ts)) + '" cy="' + n1(Y(shareAt(last, id))) +
+      '" r="3.5" style="fill:' + col + '"/>';
+    if (markTs && markTs > t0) {
+      markers += '<line class="ch-mark" x1="' + n1(X(markTs)) + '" y1="' + padT + '" x2="' +
+        n1(X(markTs)) + '" y2="' + n1(padT + ph) + '"/>';
+    }
+    legend.push({ id, col, pct: shareAt(last, id) });
+  });
+
+  const aria = "Multi-line chart: reachable post-fork nodes grouped by the newest policy their " +
+    "software enforces, each a percentage of the reachable total, over time, the groups summing to 100.";
+  host.insertAdjacentHTML("afterbegin",
+    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' +
+    esc(aria) + '">' + grid + xax + markers + lines + "</svg>");
+
+  $("pcLegend").replaceChildren(...legend.map(it => el("span", { class: "pc-leg" },
+    el("span", { class: "pc-sw", style: "background:" + it.col }),
+    el("span", null, pcLabel(it.id) + " "),
+    el("span", { class: "pv" }, Math.round(it.pct) + "%"))));
+  const last = pts[pts.length - 1];
+  $("pcCap").textContent = fmt(pts.length) + " samples, " + utcLabel(pts[0].ts) + " to " +
+    utcLabel(last.ts) + ". Each node counted once, in the newest policy its software enforces; " +
+    "a lower bound measured by one crawler.";
+}
+
 let redrawPending = false;
 window.addEventListener("resize", () => {
-  if (redrawPending || !ADOPT_SERIES) return;
+  if (redrawPending) return;
+  if (!ADOPT_SERIES && !POLICY_SERIES) return;
   redrawPending = true;
-  requestAnimationFrame(() => { redrawPending = false; drawAdoption(); });
+  requestAnimationFrame(() => {
+    redrawPending = false;
+    if (ADOPT_SERIES) drawAdoption();
+    if (POLICY_SERIES) drawPolicyChart();
+  });
 });
 
 // Cache-bust so a refresh shows the newest push rather than a cached copy.
@@ -665,3 +831,37 @@ fetch("history.json?t=" + Date.now())
   .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
   .then(renderHistory)
   .catch(() => { ADOPT_SERIES = null; $("adoptionSection").hidden = true; });
+
+// Donate: copy the address to the clipboard. Independent of every fetch above, so it works
+// even if the census file never loads. The address is read from the button's own data
+// attribute, so a copy never depends on how the <code> element happened to render.
+const donateCopy = $("donateCopy");
+if (donateCopy) {
+  donateCopy.addEventListener("click", () => {
+    const addr = donateCopy.getAttribute("data-addr") || "";
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(addr).then(() => {
+      const prev = donateCopy.textContent;
+      donateCopy.textContent = "Copied";
+      donateCopy.classList.add("done");
+      setTimeout(() => { donateCopy.textContent = prev; donateCopy.classList.remove("done"); }, 1600);
+    }).catch(() => {});
+  });
+}
+
+// Release adoption table: independent, hides its own section on any failure.
+fetch("releases.json?t=" + Date.now())
+  .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  .then(renderReleases)
+  .catch(() => { $("releasesSection").hidden = true; });
+
+// Policy adoption chart needs the series plus id->label names from policies.json. The labels
+// fetch never blocks the chart: on any failure the ids fall back to readable defaults.
+fetch("policies.json?t=" + Date.now())
+  .then(r => (r.ok ? r.json() : []))
+  .then(pol => { if (Array.isArray(pol)) for (const p of pol) if (p && p.id) POLICY_LABELS[p.id] = p.short || p.name || p.id; })
+  .catch(() => {})
+  .finally(() => fetch("policy-history.json?t=" + Date.now())
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(h => renderPolicyHistory(h, POLICY_LABELS))
+    .catch(() => { POLICY_SERIES = null; $("policyChartSection").hidden = true; }));

@@ -1,0 +1,488 @@
+#!/bin/bash
+#
+# seed-publish -- push the newest census sample to the GitHub Pages site.
+#
+# Takes the last line of census.jsonl, adds the fields the page needs that are
+# policy rather than measurement (activation height, which releases actually
+# contain the rule), and commits it as data.json.
+#
+# Also emits history.json: the whole census series, trimmed, so the page can
+# draw an adoption curve without shipping the raw JSON-lines file.
+#
+# Pushes with a repo-scoped deploy key, not an account token: if this host is
+# ever compromised the key can write to this one repository and nothing else.
+#
+# Commits only when the content changed, so the history stays meaningful rather
+# than one empty commit per hour.
+
+set -uo pipefail
+
+CENSUS="${CENSUS:-/var/lib/dnsseed/census.jsonl}"
+WORK="${WORK:-/var/lib/census-site}"
+# REPO has no default: it is the git URL of YOUR census site repository, and a
+# default pointing at someone else's would make a fresh install try to publish
+# there. Set it in /etc/default/seed-publish (see seed-publish.default.example).
+REPO="${REPO:-}"
+KEY="${KEY:-/root/.ssh/census_deploy}"
+# Identity on the hourly commits. Public in the site repo's history.
+GIT_NAME="${GIT_NAME:-seed-publish}"
+GIT_EMAIL="${GIT_EMAIL:-seed-publish@localhost}"
+
+# Policy values (activation height, window end, oldest enforcing release) are NO LONGER set
+# here. They live in policies.json: an ordered list of epochs in the site repo, so one rule can
+# hand off to the next and a single edit moves the activation window, the enforcement split and
+# the per-policy chart together. See policy_model.parse_policies for the schema and validation,
+# and DEPLOY.md for how to edit it. Setting the old ACTIVATION/ACTIVATION_END/ENFORCING_MIN_VERSION
+# env vars now only prints a warning (see the loop further down).
+#
+# How a user agent is classified (classify_enforcing() in policy_model): only the LEADING
+# "/Satoshi:X.Y.Z(optional comment)/Knots:YYYYMMDD(optional rcN)/" is parsed, in the
+# exact shape FormatSubVersion() in clientversion.cpp emits for an official release
+# build, anchored at the start of the string; anything after it (a /Plumb:6/ or
+# /PATUM:.../ wrapper segment) is ignored. A string that does not start that way is
+# NOT enforcing: renamed forks (/OracleKnots:...), plain /Satoshi:X/ without a Knots
+# segment, git/dev builds (/Knots:20260508-abc1234/), and anything malformed. The page
+# shows OracleKnots as an unverified third-party build, never as enforcing.
+#
+# enforcing_versions in data.json is GENERATED from this classifier (every user agent
+# in the published sample that classifies as enforcing), so the page's exact-string
+# lookup keeps working with no change to census.js.
+#
+# This replaces the old ENFORCING_JSON exact-string allowlist, which missed every
+# enforcing build whose user agent carried a trailing segment or a newer version.
+# ENFORCING_JSON is now ignored with a warning. There is deliberately no allowlist
+# override: the only thing it could add is a string the classifier rejects, i.e. a
+# renamed fork or a non-release build, and those must not count as enforcing.
+# Policy now comes from policies.json: an ordered list of epochs (activation height, end
+# height, oldest enforcing release) in the site repo, read at generation time. The old single
+# constants are gone -- a multi-policy network (one rule handing off to the next) cannot be
+# expressed by one triple. TOOLS is where the shared python lives (policy_model.py + the two
+# generators), in the same clone.
+# policies.json is DATA and lives in the site repo clone ($WORK), editable + reviewable there.
+# TOOLS is CODE and must NOT come from the auto-updated clone: a push to the repo would then be
+# code execution on the seed. The operator installs the tools to a fixed path they control (see
+# DEPLOY.md), so the classifier can only change through a deliberate deploy, never a git push.
+POLICIES="${POLICIES:-$WORK/policies.json}"
+TOOLS="${TOOLS:-/usr/local/lib/census-tools}"
+export TOOLS
+
+for _old in ACTIVATION ACTIVATION_END ENFORCING_MIN_VERSION ENFORCING_JSON; do
+    eval "_v=\${$_old:-}"
+    [ -n "$_v" ] && echo "warning: $_old is no longer used; policy comes from policies.json ($POLICIES)" >&2
+done
+
+# Python shared by both generators and the self-test. The consensus classifier and the policy
+# model have ONE home -- $TOOLS/policy_model.py (the deployed, self-tested module) -- and are
+# imported here rather than copied, so the version seed-publish uses and the version the two
+# generators use can never drift. $TOOLS must be exported before any run_py call.
+IFS= read -r -d '' COMMON_PY <<'PY' || true
+import os, sys
+sys.path.insert(0, os.environ.get("TOOLS", ""))
+from policy_model import (  # noqa: F401
+    _OFFICIAL_KNOTS_UA, _version_tuple, parse_min_version,
+    classify_enforcing, canonicalize, parse_policies, current_policy,
+)
+PY
+
+# Feed COMMON_PY followed by the caller's heredoc to python3 on stdin.
+run_py() {
+    { printf '%s\n' "$COMMON_PY"; cat; } | python3 - "$@"
+}
+
+# `seed-publish --self-test`: check the classifier against a fixed table and exit,
+# touching no repository and no census file. Run it after every deploy.
+if [ "${1:-}" = "--self-test" ]; then
+    run_py "29.4.2" <<'PY'
+import sys
+min_version = parse_min_version(sys.argv[1])
+CASES = [
+    # 29.4.1 predates knots#419: final, rcs, a commented variant
+    ("/Satoshi:29.4.1/Knots:20260508/", False),
+    ("/Satoshi:29.4.1/Knots:20260508rc4/", False),
+    ("/Satoshi:29.4.1/Knots:20260508rc5/", False),
+    ("/Satoshi:29.4.1(MiniBolt node)/Knots:20260508/", False),
+    # 29.4.2 rc1, rc2 and final all contain it
+    ("/Satoshi:29.4.2/Knots:20260508/", True),
+    ("/Satoshi:29.4.2/Knots:20260508rc1/", True),
+    ("/Satoshi:29.4.2/Knots:20260508rc2/", True),
+    # -uacomment forms, including several comments joined with "; "
+    ("/Satoshi:29.4.2(BIP110 meow miao)/Knots:20260508/", True),
+    ("/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/", True),
+    ("/Satoshi:29.4.2(a; b-c_d?e@f,g)/Knots:20260508/", True),
+    ("/Satoshi:29.4.2()/Knots:20260508/", True),
+    # trailing segments after the Knots one are ignored
+    ("/Satoshi:29.4.2/Knots:20260508/Plumb:5/", True),
+    ("/Satoshi:29.4.2/Knots:20260508/Plumb:6/", True),
+    ("/Satoshi:29.4.2/Knots:20260508/PATUM:1.0.1(https://b.pyblock.xyz:8443)/PyBLOCK Crew/", True),
+    ("/Satoshi:29.4.1/Knots:20260508/Plumb:6/", False),
+    # newer versions
+    ("/Satoshi:29.4.3/Knots:20260508rc1/", True),
+    ("/Satoshi:29.5.0/Knots:20270101/", True),
+    ("/Satoshi:30.0/Knots:20270101/", True),
+    ("/Satoshi:30.0.0/Knots:20270101/", True),
+    ("/Satoshi:29.10.0/Knots:20270101/", True),   # numeric, not string, comparison
+    ("/Satoshi:29.4/Knots:20260508/", False),     # 29.4 means 29.4.0
+    # third-party forks and non-Knots
+    ("/OracleKnots:29.4.2(Forever Money)/OracleKnots:20260508/", False),
+    ("/OracleKnots:29.4.2/OracleKnots:20260508rc2/", False),
+    ("/Satoshi:29.4.2/", False),
+    ("/Satoshi:29.1.0/", False),
+    ("/Knots:29.4.2/PATUM:1.0.0(https://b.pyblock.xyz:8443)/PyBLOCK Crew/", False),
+    ("/GrayersDad:08.30.2026=BLAKE2b/", False),
+    # anchored at the start: anything in front disqualifies it
+    ("/Fake:1.0/Satoshi:29.4.2/Knots:20260508/", False),
+    (" /Satoshi:29.4.2/Knots:20260508/", False),
+    # malformed or modified Knots segment: fail closed
+    ("/Satoshi:29.4.2/Knots:20260508x/", False),
+    ("/Satoshi:29.4.2/Knots:20260508.plumb4/", False),
+    ("/Satoshi:29.4.2/Knots:20260508-abc1234/", False),
+    ("/Satoshi:29.4.2/Knots:2026058/", False),
+    ("/Satoshi:29.4.2/Knots:20260508rc/", False),
+    ("/Satoshi:29.4.2/Knots:20260508", False),
+    ("/Satoshi:29.4.2.1/Knots:20260508/", False),
+    ("/Satoshi:29.4.2(x)/Knots:20260508)/", False),
+    ("/Satoshi:29.4.2(x/y)/Knots:20260508/", False),
+    ("/satoshi:29.4.2/knots:20260508/", False),
+    # garbage
+    ("", False),
+    ("garbage", False),
+    ("/", False),
+    (None, False),
+]
+failed = 0
+for ua, want in CASES:
+    got = classify_enforcing(ua, min_version)
+    failed += got != want
+    print("%s  %-5s  %r" % ("ok  " if got == want else "FAIL", got, ua))
+# the minimum is a real knob: raising it moves 29.4.2 out
+if classify_enforcing("/Satoshi:29.4.2/Knots:20260508/", parse_min_version("29.4.3")):
+    print("FAIL  min 29.4.3 still counts 29.4.2")
+    failed += 1
+else:
+    print("ok    min 29.4.3 excludes 29.4.2")
+print("%d/%d passed" % (len(CASES) + 1 - failed, len(CASES) + 1))
+sys.exit(1 if failed else 0)
+PY
+    rc=$?
+    # Also run the shared tools' own self-tests (policy model + the two generators), so one
+    # --self-test proves every consensus-sensitive path. Requires the clone to be present.
+    for _m in policy_model gen_releases gen_policy_history; do
+        if [ -f "$TOOLS/$_m.py" ]; then
+            echo "--- $_m ---"
+            python3 "$TOOLS/$_m.py" --self-test || rc=1
+        else
+            echo "self-test: $TOOLS/$_m.py not found (is the site repo cloned at $WORK?)" >&2
+            rc=1
+        fi
+    done
+    exit $rc
+fi
+
+export GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+
+[ -n "$REPO" ] || { echo "REPO is not set (the git URL of your census site repo); see /etc/default/seed-publish" >&2; exit 1; }
+[ -s "$CENSUS" ] || { echo "no census data at $CENSUS" >&2; exit 1; }
+
+if [ ! -d "$WORK/.git" ]; then
+    echo "cloning site repo into $WORK"
+    rm -rf "$WORK"
+    git clone --quiet "$REPO" "$WORK" || { echo "clone failed" >&2; exit 1; }
+fi
+
+cd "$WORK" || exit 1
+git config user.email "$GIT_EMAIL"
+git config user.name "$GIT_NAME"
+
+# Discard any local drift and follow the remote, so a hand edit on GitHub is
+# never silently clobbered into a conflict this script cannot resolve.
+git fetch --quiet origin main 2>/dev/null
+git reset --quiet --hard origin/main 2>/dev/null
+
+run_py "$CENSUS" "$POLICIES" "$TOOLS" > data.json.new <<'PY'
+import json, sys
+census, policies_path, tools = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, tools)
+from policy_model import parse_policies, current_policy
+with open(policies_path) as f:
+    policies = parse_policies(f.read())
+with open(census) as f:
+    last = [l for l in f if l.strip()][-1]
+d = json.loads(last)
+# The policy in force at the current tip (or the earliest, before any activation) drives the
+# activation window and which releases count as enforcing -- one policies.json edit moves all
+# of it, so the activation section and the enforcement split can never disagree.
+cur = current_policy(policies, int(d.get("max_height") or 0)) or policies[0]
+min_version = cur["min_version"]
+d["activation_height"] = cur["activation"]
+d["activation_end_height"] = cur["end"]
+
+# Merge versions whose only difference is a -uacomment under their canonical key, so
+# every downstream reader of d["versions"] (the page's own JS included) sees one row per
+# actual build rather than one per vanity string, and enforcing_versions membership
+# (plain string equality, done client-side too) just works without any JS change.
+raw_versions = d.get("versions")
+if isinstance(raw_versions, dict):
+    merged = {}
+    for ua, count in raw_versions.items():
+        try:
+            n = int(count or 0)
+        except (TypeError, ValueError):
+            n = 0
+        merged[canonicalize(ua)] = merged.get(canonicalize(ua), 0) + n
+    d["versions"] = merged
+
+# The page decides enforcement by exact string lookup in this list against the keys of
+# d["versions"]. Generate it from the classifier over every user agent this sample
+# publishes (the merged versions keys plus the raw heights_by_version keys), so the
+# page and the split below always agree. Sorted for a stable diff between runs.
+seen = set()
+for field in ("versions", "heights_by_version"):
+    if isinstance(d.get(field), dict):
+        seen.update(d[field].keys())
+d["enforcing_versions"] = sorted(ua for ua in seen if classify_enforcing(ua, min_version))
+
+d["heights"] = {
+    "tip": d.pop("h_tip", 0), "near": d.pop("h_near", 0),
+    "day": d.pop("h_day", 0), "behind": d.pop("h_behind", 0),
+}
+
+# Chain agreement split by whether a node enforces the rule. Policy (the
+# classifier) lives here; the per-version measurement comes from the census
+# script. heights_by_version is deliberately left in the output as well -- this
+# is an additional view of it, not a replacement. Each raw user agent goes
+# through classify_enforcing(); anything that is not an official Knots release
+# at ENFORCING_MIN_VERSION or newer is not_enforcing.
+#
+# Census lines written before heights_by_version existed have no such field. In
+# that case the key is omitted entirely rather than emitted as zeros, so the
+# page can tell "no data" apart from "data, and it is zero".
+hbv = d.get("heights_by_version")
+if isinstance(hbv, dict):
+    split = {
+        "enforcing": {"tip": 0, "near": 0, "day": 0, "behind": 0},
+        "not_enforcing": {"tip": 0, "near": 0, "day": 0, "behind": 0},
+    }
+    for ua, buckets in hbv.items():
+        side = split["enforcing"] if classify_enforcing(ua, min_version) else split["not_enforcing"]
+        if not isinstance(buckets, dict):
+            buckets = {}
+        for bucket in ("tip", "near", "day", "behind"):
+            try:
+                side[bucket] += int(buckets.get(bucket, 0) or 0)
+            except (TypeError, ValueError):
+                pass
+    d["heights_by_enforcement"] = split
+
+print(json.dumps(d, indent=1, sort_keys=True))
+PY
+
+if [ ! -s data.json.new ]; then
+    echo "generator produced nothing, refusing to publish" >&2
+    rm -f data.json.new
+    exit 1
+fi
+python3 -m json.tool data.json.new >/dev/null 2>&1 || {
+    echo "generated data.json is not valid JSON, refusing to publish" >&2
+    rm -f data.json.new; exit 1
+}
+mv data.json.new data.json
+
+# history.json -- the adoption curve. One point per census sample, oldest first.
+#
+# Deliberately NOT merged into the data.json generator. That one reads a single
+# line and must fail hard if it is bad, because it is the live number. This one
+# reads the whole file and SKIPS lines it cannot parse, because a series with a
+# hole in it is still useful and a torn write halfway down the file should not
+# take the site down. The asymmetry is intentional. If nothing parses at all we
+# print nothing, which trips the same fail-closed check below.
+#
+# No percentage is computed here: b2b_reachable ships alongside enforcing so the
+# page does the division itself and cannot disagree about the denominator.
+run_py "$CENSUS" "$POLICIES" "$TOOLS" > history.json.new <<'PY'
+import json, sys
+census, policies_path, tools = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, tools)
+from policy_model import parse_policies, current_policy
+with open(policies_path) as f:
+    policies = parse_policies(f.read())
+
+with open(census) as f:
+    lines = [l for l in f if l.strip()]
+# Trim BEFORE parsing so parse cost stays bounded however long the file grows.
+# File order is chronological, so this keeps the 2000 most recent samples and
+# preserves oldest -> newest ordering.
+lines = lines[-2000:]
+
+
+def as_int(value):
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+# The "enforcing" line means nodes enforcing the policy in force at the latest tip, applied
+# retroactively across the whole series (same rule, and the same min_version, as data.json's
+# split), so editing policies.json re-scores the curve rather than kinking it. The richer
+# per-policy breakdown lives in policy-history.json.
+# Use the LAST valid sample's height -- the same reference data.json uses -- so the two always
+# pick the same in-force policy. max_height is peer-reported, so taking the max over all samples
+# (as before) let one spoofed height permanently select a later epoch here but not in data.json.
+# A line that is valid JSON but not an object is skipped, not crashed on.
+_latest_mh = 0
+for _l in reversed(lines):
+    try:
+        _r = json.loads(_l)
+    except ValueError:
+        continue
+    if isinstance(_r, dict):
+        _latest_mh = as_int(_r.get("max_height"))
+        break
+_cur = current_policy(policies, _latest_mh) or policies[0]
+min_version = _cur["min_version"]
+
+
+points = []
+for line in lines:
+    try:
+        rec = json.loads(line)
+    except ValueError:
+        continue
+    if not isinstance(rec, dict):
+        continue
+    versions = rec.get("versions")
+    if not isinstance(versions, dict):
+        versions = {}
+    # Applied RETROACTIVELY with the CURRENT classifier, from the per-version counts
+    # each sample stored: the whole series is rescored on every run, so the curve is
+    # never kinked by a policy change partway through it.
+    enforcing_count = sum(
+        as_int(count) for ua, count in versions.items() if classify_enforcing(ua, min_version)
+    )
+    points.append({
+        "ts": as_int(rec.get("ts")),
+        "b2b": as_int(rec.get("b2b")),
+        "b2b_reachable": as_int(rec.get("b2b_reachable")),
+        "max_height": as_int(rec.get("max_height")),
+        "enforcing": enforcing_count,
+    })
+
+if points:
+    sys.stdout.write(json.dumps(points, separators=(",", ":")) + "\n")
+PY
+
+if [ ! -s history.json.new ]; then
+    echo "history generator produced nothing, refusing to publish" >&2
+    rm -f history.json.new
+    exit 1
+fi
+python3 -m json.tool history.json.new >/dev/null 2>&1 || {
+    echo "generated history.json is not valid JSON, refusing to publish" >&2
+    rm -f history.json.new; exit 1
+}
+mv history.json.new history.json
+
+# releases.json and policy-history.json -- the growing release-adoption table and the
+# exclusive-bucket policy series, both derived from the whole census.jsonl by the shared tools
+# and validated before replacing the live file. A failure here keeps the previous file (like
+# stable-nodes below); a bad policies.json has already failed the data.json step above and
+# refused the whole publish, so these never run against one.
+gen_one() {  # <script> <out> <args...>
+    _script="$1"; _out="$2"; shift 2
+    if python3 "$TOOLS/$_script" "$@" > "$_out.new" 2>/dev/null \
+       && python3 -m json.tool "$_out.new" >/dev/null 2>&1; then
+        mv "$_out.new" "$_out"
+    else
+        echo "$_out generation failed, keeping the previous file" >&2
+        rm -f "$_out.new"
+    fi
+}
+gen_one gen_releases.py releases.json "$CENSUS"
+gen_one gen_policy_history.py policy-history.json "$CENSUS" "$POLICIES"
+
+# Stable-node list, for people running a curated fixed-list seed. Evidence for a
+# human to curate from, not a list to serve unexamined.
+DUMP="${DUMP:-/var/lib/dnsseed/dnsseed.dump}"
+# When the current crawler started collecting (CRAWLER_START, e.g. 2026-09-27T21:28:00Z, set in
+# /etc/default/seed-publish). A service restart does not reset the crawler history, so the unit
+# start time is only a fallback.
+if [ -n "${CRAWLER_START:-}" ]; then
+    START="$(date -d "$CRAWLER_START" +%s 2>/dev/null || echo 0)"
+else
+    START="$(date -d "$(systemctl show lionseed -p ActiveEnterTimestamp --value)" +%s 2>/dev/null || echo 0)"
+fi
+if [ -f "$DUMP" ] && command -v seed-stable >/dev/null; then
+    if seed-stable "$DUMP" "$START" > stable-nodes.json.new 2>/dev/null \
+       && python3 -m json.tool stable-nodes.json.new >/dev/null 2>&1; then
+        mv stable-nodes.json.new stable-nodes.json
+    else
+        echo "stable-nodes generation failed, keeping the previous file" >&2
+        rm -f stable-nodes.json.new
+    fi
+fi
+
+# Fork-only copy of the crawler dump, in dnsseed.dump format, for makeseeds.py and anyone
+# else building a node list. Named seeds.txt like the other seeds in contrib/seeds/README.md. Crawl data may be published under point 5 of the DNS seed
+# policy. Only rows with the BLAKE2b service bit (28, first hex digit odd) are kept; the
+# full dump is mostly SHA256d nodes and would bloat this repository. Published through
+# GitHub Pages so the seed host does not have to run a web server.
+if [ -f "$DUMP" ]; then
+    awk 'NR == 1 || substr($10, 1, 1) ~ /^[13579bdfBDF]$/' "$DUMP" > seeds.txt.new
+    rows=$(( $(wc -l < seeds.txt.new) - 1 ))
+    if [ "$rows" -ge 10 ]; then
+        mv seeds.txt.new seeds.txt
+    else
+        echo "fork dump has only $rows rows, keeping the previous file" >&2
+        rm -f seeds.txt.new
+    fi
+fi
+
+# Stage first, then compare against the index. `git diff` on its own reports no
+# change for an UNTRACKED file, so on the very first run a brand new data.json
+# would look unchanged and never get committed. history.json goes through the
+# same explicit add, so the check below covers it with no extra logic.
+#
+# One `git add` PER FILE, and only for files that exist. `git add a b c` is
+# atomic: if any one pathspec matches nothing it exits 128 and stages NOTHING,
+# so a missing stable-nodes.json (first ever run, or a failed seed-stable) used
+# to silently drop the validated data.json and history.json too -- and with
+# stderr discarded the run then printed "no change since last publish" and
+# exited 0 while publishing nothing. `git add --` does not help; the pathspec
+# check is per argument. stable-nodes.json is optional; the other two are not,
+# and a real staging failure on them exits non-zero rather than being mistaken
+# for "nothing changed".
+stage_failed=0
+for f in data.json history.json; do
+    if [ -f "$f" ]; then
+        git add -- "$f" || stage_failed=1
+    else
+        echo "$f missing at stage time, refusing to publish" >&2
+        stage_failed=1
+    fi
+done
+if [ -f stable-nodes.json ]; then
+    git add -- stable-nodes.json \
+        || echo "could not stage stable-nodes.json, continuing without it" >&2
+fi
+for _f in releases.json policy-history.json; do
+    [ -f "$_f" ] && { git add -- "$_f" || echo "could not stage $_f, continuing without it" >&2; }
+done
+if [ -f seeds.txt ]; then
+    git add -- seeds.txt \
+        || echo "could not stage seeds.txt, continuing without it" >&2
+fi
+if [ "$stage_failed" -ne 0 ]; then
+    exit 1
+fi
+if git diff --cached --quiet 2>/dev/null; then
+    echo "no change since last publish"
+    exit 0
+fi
+
+git commit --quiet -m "census $(date -u '+%Y-%m-%d %H:%M UTC')"
+if git push --quiet origin main; then
+    echo "published $(date -u '+%Y-%m-%d %H:%M UTC')"
+else
+    echo "push failed" >&2
+    exit 1
+fi
