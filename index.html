@@ -181,8 +181,6 @@ details.dt p+p{margin-top:9px}
                border:0;padding:9px 15px;cursor:pointer;flex:none}
 .donate button:hover{opacity:.9}
 .donate button.done{background:var(--ok)}
-.donate-warn{margin:8px 0 0;font-size:12px;color:var(--text-2)}
-.donate-warn strong{color:var(--text)}
 @media (max-width:520px){ .fig{padding:14px} }
 </style>
 </head>
@@ -418,7 +416,7 @@ details.dt p+p{margin-top:9px}
       <p class="cap" id="releaseNote"></p>
     </section>
 
-    <section id="heightsSection">
+    <section id="heightsSection" class="span2">
       <div class="sec-head">
         <h2>Are nodes agreeing on the chain?</h2>
         <details class="dt"><summary>what is this?</summary>
@@ -511,9 +509,6 @@ details.dt p+p{margin-top:9px}
       <button type="button" id="donateCopy"
               data-addr="bc1q7ar68gl3vhpj6h6n8a3zlnqgjcm2qeatenrgm5">Copy address</button>
     </div>
-    <p class="donate-warn"><strong>XBT (BLAKE2b) only &mdash; not Bitcoin.</strong> This address is on
-       the fork network; it reuses Bitcoin&rsquo;s address format, so a Bitcoin wallet can send real BTC
-       to it. Send only XBT.</p>
   </section>
 
   <footer>
