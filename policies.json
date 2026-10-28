@@ -1,4 +1,12 @@
-[
+[  
+  {
+    "id": "maturity45",
+    "name": "Long coinbase maturity",
+    "short": "45-day maturity",
+    "activation": 973440,
+    "end": 979920,
+    "enforcing_min_version": "29.4.2"
+  },
   {
     "id": "#468",
     "name": "#468",
