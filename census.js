@@ -82,6 +82,7 @@ function render(d) {
   renderActivation(d, entries, enforcing);
   renderHeights(d);
   renderNetworks(d);
+  renderStorage(d);
   renderShareTiles(d);
 
   // The adoption chart needs the activation height to place its marker, but that value
@@ -113,6 +114,28 @@ function renderNetworks(d) {
   rows.sort((a, b) => b[1] - a[1]);
   const max = Math.max(...rows.map(r => r[1]), 1);
   $("networkBars").replaceChildren(...rows.map(([label, n]) => el("div", { class: "bar-row" },
+    el("span", { class: "bar-label" }, label),
+    el("span", { class: "bar-val" }, fmt(n) + "  ·  " + (n / total * 100).toFixed(1) + "%"),
+    el("span", { class: "bar-track" },
+      el("span", { class: "bar-fill", style: "width:" + (n / max * 100).toFixed(1) + "%" })))));
+}
+
+// ---- Archival vs pruned (storage_* from the advertised service bits) ----
+function renderStorage(d) {
+  const sec = $("storageSection");
+  if (!sec) return;
+  const keys = [["Archival (full history)", "storage_archival"],
+                ["Pruned (recent blocks only)", "storage_pruned"],
+                ["Advertises neither", "storage_other"]];
+  // Absent field = an older sample that predates it: hide, never show zeros.
+  if (!keys.every(([, k]) => numOr(d[k], null) !== null)) { sec.hidden = true; return; }
+  const rows = keys.map(([label, k]) => [label, numOr(d[k], 0)]).filter(r => r[1] > 0);
+  const total = rows.reduce((s, r) => s + r[1], 0);
+  if (total <= 0) { sec.hidden = true; return; }
+  sec.hidden = false;
+  rows.sort((a, b) => b[1] - a[1]);
+  const max = Math.max(...rows.map(r => r[1]), 1);
+  $("storageBars").replaceChildren(...rows.map(([label, n]) => el("div", { class: "bar-row" },
     el("span", { class: "bar-label" }, label),
     el("span", { class: "bar-val" }, fmt(n) + "  ·  " + (n / total * 100).toFixed(1) + "%"),
     el("span", { class: "bar-track" },
