@@ -6,5 +6,14 @@
     "activation": 973440,
     "end": 979920,
     "enforcing_min_version": "29.4.2"
+  },
+
+  {
+    "id": "#468",
+    "name": "#468",
+    "short": "#468",
+    "activation": 979400,
+    "end": 1005839,
+    "enforcing_min_version": "29.4.3"
   }
 ]

@@ -201,23 +201,23 @@ details.dt p+p{margin-top:9px}
   <div id="err"></div>
 
   <div class="figures" aria-label="Key figures, updated hourly">
-    <div class="fig lead"><div class="v num" id="figUp">&mdash;</div>
+    <div class="fig lead"><div class="v num" id="figUp"></div>
       <div class="k">post-fork nodes rated good</div><div class="note">by the seeder&rsquo;s own quality gate</div></div>
-    <div class="fig"><div class="v num" id="figB2">&mdash;</div>
+    <div class="fig"><div class="v num" id="figB2"></div>
       <div class="k">advertise the post-fork bit</div><div class="note">seen by the crawler</div></div>
-    <div class="fig"><div class="v num" id="figCrawl">&mdash;</div>
+    <div class="fig"><div class="v num" id="figCrawl"></div>
       <div class="k">nodes crawled overall</div><div class="note">both chains share port 8333</div></div>
-    <div class="fig"><div class="v num" id="figTip">&mdash;</div>
+    <div class="fig"><div class="v num" id="figTip"></div>
       <div class="k">highest block seen</div><div class="note">across post-fork nodes</div></div>
-    <div class="fig"><div class="v num" id="figShare">&mdash;</div>
+    <div class="fig"><div class="v num" id="figShare"></div>
       <div class="k" id="figShareK">of crawled nodes advertise the post-fork bit</div>
       <details class="dt"><summary>what is this?</summary>
-        <div class="note" id="figShareNote">&mdash;</div>
+        <div class="note" id="figShareNote"></div>
       </details></div>
-    <div class="fig"><div class="v num" id="figFresh">&mdash;</div>
+    <div class="fig"><div class="v num" id="figFresh"></div>
       <div class="k" id="figFreshK">of post-fork nodes were polled recently</div>
       <details class="dt"><summary>what is this?</summary>
-        <div class="note" id="figFreshNote">&mdash;</div>
+        <div class="note" id="figFreshNote"></div>
       </details></div>
   </div>
 
@@ -245,7 +245,7 @@ details.dt p+p{margin-top:9px}
       </div>
 
       <details class="dt" style="margin-top:14px">
-        <summary>How this is measured &mdash; what is this?</summary>
+        <summary>How this is measured?</summary>
         <div class="notes">
           <strong>How this is measured</strong>
           <ul>
@@ -291,7 +291,7 @@ details.dt p+p{margin-top:9px}
     <section id="reachabilitySection" class="span2">
       <div class="sec-head">
         <h2 id="actTitle">Long coinbase maturity activates at block
-          <span class="num" id="actHeight">&mdash;</span></h2>
+          <span class="num" id="actHeight"></span></h2>
         <p id="actWindowLine" hidden></p>
         <details class="dt"><summary>what is this?</summary>
           <p>PR #419 changes a consensus rule. A node on an older release is not necessarily on a
@@ -301,17 +301,17 @@ details.dt p+p{margin-top:9px}
       </div>
       <div class="countdown">
         <div>
-          <div class="big num" id="cdBlocks">&mdash;</div>
+          <div class="big num" id="cdBlocks"></div>
           <div class="lbl" id="cdBlocksLbl">blocks remaining</div>
           <div class="sub" id="cdBlocksSub" hidden></div>
         </div>
         <div>
-          <div class="big num" id="cdDays">&mdash;</div>
+          <div class="big num" id="cdDays"></div>
           <div class="lbl" id="cdDaysLbl">days, at ~10 min/block</div>
           <div class="sub" id="cdDaysSub" hidden></div>
         </div>
         <div>
-          <div class="big num" id="cdReady">&mdash;</div>
+          <div class="big num" id="cdReady"></div>
           <div class="lbl" id="cdReadyLbl">of reachable post-fork nodes on a release containing it</div>
           <div class="sub" id="cdReadySub" hidden></div>
         </div>
@@ -323,7 +323,7 @@ details.dt p+p{margin-top:9px}
              aria-label="Position in the long coinbase maturity window, in blocks">
           <span class="act-fill" id="actFill" style="width:0%"></span>
         </div>
-        <p class="act-text" id="actProgressText">&mdash;</p>
+        <p class="act-text" id="actProgressText"></p>
       </div>
 
       <div id="adoptionSection" hidden style="margin-top:28px">
@@ -358,7 +358,7 @@ details.dt p+p{margin-top:9px}
       <div class="act-block" id="actRisk" hidden>
         <h3>Reachable post-fork nodes not on an enforcing release</h3>
         <div class="ne-head">
-          <span class="big num" id="neCount">&mdash;</span>
+          <span class="big num" id="neCount"></span>
           <span class="lbl" id="neCountLbl">of the reachable post-fork nodes counted</span>
         </div>
         <div class="bars ne-list" id="neList"></div>
@@ -382,8 +382,8 @@ details.dt p+p{margin-top:9px}
         <h2>Where the reachable nodes are</h2>
         <details class="dt"><summary>what is this?</summary>
           <p>Reachable post-fork nodes split by the network they are reached on: clearnet
-             (IPv4 / IPv6), Tor v3 and I2P. This crawler connects to all four, so the Tor and
-             I2P counts are measured, not estimated &mdash; most crawlers never reach those
+             (IPv4 / IPv6), Tor v3 and I2P. This crawler connects to all four so the Tor and
+             I2P counts are measured, not estimated, most crawlers never reach those
              networks and so under-count or omit them entirely.</p>
         </details>
       </div>
@@ -421,7 +421,7 @@ details.dt p+p{margin-top:9px}
         <h2>Are nodes agreeing on the chain?</h2>
         <details class="dt"><summary>what is this?</summary>
           <p>Each node reports its block height during the handshake. A cluster stuck well behind
-             the rest is the first visible sign of a chain split &mdash; so the post-fork nodes are
+             the rest is the first visible sign of a chain split, so the post-fork nodes are
              split here into those on an enforcing release and those not, to show whether the
              two groups are drifting apart.</p>
         </details>
@@ -445,7 +445,7 @@ details.dt p+p{margin-top:9px}
 
     <section id="stableSection" class="span2">
       <div class="sec-head">
-        <h2>Stable nodes list, for fixed-seed runners</h2>
+        <h2>Stable nodes list</h2>
         <details class="dt"><summary>what is this?</summary>
           <p>If you run a <strong>curated, fixed-list</strong> seed rather than a crawler, the hard
              part is knowing which nodes are actually reliable. This is that evidence: post-fork nodes
@@ -464,11 +464,11 @@ details.dt p+p{margin-top:9px}
       </div>
 
       <div class="figures" style="margin-top:16px">
-        <div class="fig lead"><div class="v num" id="stQual">&mdash;</div>
-          <div class="k">nodes meet the bar</div><div class="note" id="stCrit">&mdash;</div></div>
-        <div class="fig"><div class="v num" id="stSeen">&mdash;</div>
+        <div class="fig lead"><div class="v num" id="stQual"></div>
+          <div class="k">nodes meet the bar</div><div class="note" id="stCrit"></div></div>
+        <div class="fig"><div class="v num" id="stSeen"></div>
           <div class="k">post-fork nodes assessed</div><div class="note">those the seeder rates good</div></div>
-        <div class="fig"><div class="v num" id="stAge">&mdash;</div>
+        <div class="fig"><div class="v num" id="stAge"></div>
           <div class="k">days of observation</div><div class="note">longer means a stronger list</div></div>
       </div>
 
@@ -498,10 +498,9 @@ details.dt p+p{margin-top:9px}
 
   <section id="donateSection">
     <div class="sec-head">
-      <h2>Support the seed</h2>
-      <p>The DNS seed behind this census runs on a small VPS, paid out of pocket. If the data is
-         useful to you, a tip toward the hosting is welcome. This is not a business &mdash; it just
-         helps cover the server bill.</p>
+      <h2>Support the seed & census</h2>
+      <p>The DNS seed behind this census runs on a small VPS paid out of pocket. If the data is
+         useful to you a tip toward the hosting is welcome. Thank you</p>
     </div>
     <div class="donate">
       <span class="k">Donate&nbsp;XBT</span>
