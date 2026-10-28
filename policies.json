@@ -4,15 +4,15 @@
     "name": "Long coinbase maturity",
     "short": "45-day maturity",
     "activation": 973440,
-    "end": 979920,
+    "end": 979919,
     "enforcing_min_version": "29.4.2"
   },
   {
-    "id": "#468",
-    "name": "#468",
-    "short": "#468",
-    "activation": 979400,
-    "end": 1005839,
+    "id": "maturity180",
+    "name": "180-day rolling coinbase maturity",
+    "short": "180-day maturity",
+    "activation": 979919,
+    "end": 1050000,
     "enforcing_min_version": "29.4.3"
   }
 ]
