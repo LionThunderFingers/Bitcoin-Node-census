@@ -8,4 +8,6 @@ Live page: https://lionthunderfingers.github.io/Bitcoin-Node-census/
 
 `policies.json` is the editable list of consensus-policy epochs (activation height, window end, oldest enforcing release). It drives the activation countdown, the enforcement split and the policy-adoption chart from one place. Edit it to record a new rule; see `tools/` for the generators and self-tests (`seed-publish --self-test`).
 
-Seeder and deploy tooling: https://github.com/LionThunderFingers/LionSeed
+The pipeline that produces these files lives in `tools/`: `seed-census` (hourly sample from the seeder's dump), `seed-publish` (builds and pushes the JSON), `seed-stable.py`, the generators and `systemd/` units. These are installed on the seed host by hand and are never run out of this clone, so a push here cannot change what executes there. `seed-census` reads the `dnsseed.dump` format written by the seeder.
+
+The seeder itself: https://github.com/LionThunderFingers/LionSeed

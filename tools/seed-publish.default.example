@@ -1,0 +1,5 @@
+REPO=git@github.com:LionThunderFingers/Bitcoin-Node-census.git
+KEY=/root/.ssh/census_deploy
+GIT_NAME=seed.thelionpool.org
+GIT_EMAIL=knots.seed@gmail.com
+CRAWLER_START=2026-09-27T21:28:00Z
