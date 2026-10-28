@@ -394,15 +394,17 @@ details.dt p+p{margin-top:9px}
       <div class="sec-head">
         <h2>Archival and pruned nodes</h2>
         <details class="dt"><summary>what is this?</summary>
-          <p>Reachable post-fork nodes split by whether they can serve the whole chain. An
-             archival node advertises <code>NODE_NETWORK</code> and serves every block. A pruned
-             node advertises only <code>NODE_NETWORK_LIMITED</code> and serves roughly the last
-             288 blocks. This is read from the service bits each node announces at handshake,
-             so it is what a node says it can do, not something we tested. A node that
-             advertises neither is counted separately.</p>
+          <p>Post-fork nodes that completed a handshake in the last 83 minutes, split by whether 
+             they can serve the whole chain. An archival node advertises <code>NODE_NETWORK</code> and 
+             serves every block. A pruned node advertises only <code>NODE_NETWORK_LIMITED</code> and 
+             serves roughly the last 288 blocks. This is read from the service bits each node 
+             announces, so it is what a node says it can do, not something we tested. Pruned 
+             nodes are counted here but are not in the &ldquo;reachable nodes&rdquo; figure 
+             above, because the seeder only counts nodes that can serve full history as good.</p>
         </details>
       </div>
       <div class="bars" id="storageBars"></div>
+      <p class="cap" id="storageNote"></p>
     </section>
 
     <section id="releasesSection" class="span2" hidden>

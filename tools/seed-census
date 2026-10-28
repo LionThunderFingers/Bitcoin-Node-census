@@ -53,21 +53,26 @@ NR > 1 {
         if ($3 + 0 > 0) {
             age = ts - ($3 + 0)
             pa[n_pa++] = age
-            if (age < 4980) recent++
+            if (age < 4980) {
+                recent++
+                # Storage class from the service bits, over the nodes that completed a
+                # handshake within the freshness window (the b2b_polled_recently
+                # population), so archival+pruned+other == b2b_polled_recently by
+                # construction. NOT over the good set: the seeder only marks a node good
+                # if it advertises NODE_NETWORK, so a pruned node is never good and a
+                # good-only split would always report zero pruned nodes. mawk has no
+                # and()/strtonum(), so bits are tested by hex-digit position (svcs is
+                # always 8 digits). NODE_NETWORK (bit 0) is the low bit of the last
+                # digit: serves full history (archival). NODE_NETWORK_LIMITED (bit 10)
+                # is the 0x4 bit of the 6th digit: advertised WITHOUT NODE_NETWORK means
+                # pruned. Neither is "other".
+                if (substr($10, 8, 1) ~ /[13579bdfBDF]/) archival++
+                else if (substr($10, 6, 1) ~ /[4567cdefCDEF]/) pruned++
+                else storother++
+            }
         }
         if ($2 == 1) {
             b2b_up++
-            # Storage class from the service bits, over the SAME population as
-            # versions (reachable fork nodes), so archival+pruned+other ==
-            # b2b_reachable by construction. mawk has no and()/strtonum(), so the
-            # bits are tested by hex-digit position (svcs is always 8 digits).
-            # NODE_NETWORK (bit 0) is the low bit of the last digit: advertising it
-            # means the node serves full history (archival). NODE_NETWORK_LIMITED
-            # (bit 10) is the 0x4 bit of the 6th digit: advertised WITHOUT
-            # NODE_NETWORK means pruned. Neither is "other" (cannot serve blocks).
-            if (substr($10, 8, 1) ~ /[13579bdfBDF]/) archival++
-            else if (substr($10, 6, 1) ~ /[4567cdefCDEF]/) pruned++
-            else storother++
             # Reachable fork node by network. Same population as b2b_up and ver[]
             # below, so net[] sums to b2b_reachable by construction.
             net[nettype($1)]++
@@ -127,7 +132,7 @@ END {
     }
     printf "{\"ts\":%d,\"dump_ts\":%d,\"total\":%d,\"reachable\":%d,", ts, dumpts, total+0, reachable+0
     printf "\"b2b\":%d,\"b2b_reachable\":%d,\"max_height\":%d,", b2b+0, b2b_up+0, maxh+0
-    # archival + pruned + other == b2b_reachable (same reachable-fork population)
+    # archival + pruned + other == b2b_polled_recently (see the classification above)
     printf "\"storage_archival\":%d,\"storage_pruned\":%d,\"storage_other\":%d,", archival+0, pruned+0, storother+0
     printf "\"b2b_poll_age_median\":%d,\"b2b_poll_age_p90\":%d,\"b2b_poll_age_max\":%d,\"b2b_polled_recently\":%d,", pa_med+0, pa_p90+0, pa_max+0, recent+0
     printf "\"h_tip\":%d,\"h_near\":%d,\"h_day\":%d,\"h_behind\":%d,\"versions\":{", tip+0, near+0, day+0, behind+0

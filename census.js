@@ -135,6 +135,9 @@ function renderStorage(d) {
   sec.hidden = false;
   rows.sort((a, b) => b[1] - a[1]);
   const max = Math.max(...rows.map(r => r[1]), 1);
+  $("storageNote").textContent = fmt(total) + " post-fork nodes completed a handshake in the last " +
+    fmt(POLL_FRESH_SECONDS / 60 | 0) + " minutes. A lower bound measured by one crawler, from the service bits " +
+    "each node advertises.";
   $("storageBars").replaceChildren(...rows.map(([label, n]) => el("div", { class: "bar-row" },
     el("span", { class: "bar-label" }, label),
     el("span", { class: "bar-val" }, fmt(n) + "  ·  " + (n / total * 100).toFixed(1) + "%"),
