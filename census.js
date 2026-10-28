@@ -51,11 +51,32 @@ function showError(msg) {
   e.replaceChildren(el("strong", null, "Could not load the latest figures."), " " + String(msg));
 }
 
+// Headline: every post-fork node that answered the crawler recently, archival AND pruned.
+// The seeder only rates a node "good" if it advertises NODE_NETWORK, so b2b_reachable (still
+// published unchanged for other consumers) leaves pruned nodes out. A sample without the
+// storage_* fields falls back to the old figure and wording rather than showing a partial sum.
+function renderHeadlineCount(d) {
+  const a = numOr(d.storage_archival, null), p = numOr(d.storage_pruned, null),
+        o = numOr(d.storage_other, null), good = numOr(d.b2b_reachable, null);
+  const k = document.getElementById("figUpK"), note = document.getElementById("figUpNote");
+  if (a === null || p === null || o === null) {
+    document.getElementById("figUp").textContent = fmtOr(d.b2b_reachable);
+    k.textContent = "post-fork nodes rated good";
+    note.textContent = "by the seeder’s own quality gate";
+    return;
+  }
+  document.getElementById("figUp").textContent = fmt(a + p + o);
+  k.textContent = "post-fork nodes reachable";
+  note.textContent = fmt(a) + " archival · " + fmt(p) + " pruned" +
+    (o > 0 ? " · " + fmt(o) + " other" : "") + ". The sections below count only the " +
+    (good === null ? DASH : fmt(good)) + " rated good by the seeder, which excludes pruned nodes.";
+}
+
 function render(d) {
   const stampTs = numOr(d.ts, null);
   document.getElementById("stamp").textContent = stampTs === null ? DASH
     : new Date(stampTs * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
-  document.getElementById("figUp").textContent = fmtOr(d.b2b_reachable);
+  renderHeadlineCount(d);
   document.getElementById("figB2").textContent = fmtOr(d.b2b);
   document.getElementById("figCrawl").textContent = fmtOr(d.total);
   document.getElementById("figTip").textContent = fmtOr(d.max_height);
@@ -726,6 +747,29 @@ function renderReleases(r) {
 // share of the reachable total, over time. Absent/short series hide the whole section.
 let POLICY_SERIES = null;        // {pts:[{ts,reach,buckets}], ids:[...], labels:{}}
 let POLICY_LABELS = {};
+let POLICY_MIN = {};             // id -> enforcing_min_version, from policies.json
+let RELEASE_ROWS = null;         // releases.json rows, for the first-seen marker times
+
+// First time the crawler saw a FINAL build (no -rcN) of an official Knots release at or above
+// this policy's minimum version. Release candidates are left out on purpose: one rc node weeks
+// before the release would otherwise pull the line to the wrong day. null = unknown, in which
+// case no marker is drawn rather than a guessed one.
+const OFFICIAL_UA = /\/Satoshi:(\d+\.\d+(?:\.\d+)?)(?:\([A-Za-z0-9 .,;_?@-]*\))?\/Knots:\d{8}(rc\d+)?\//;
+function verParts(v) { const p = String(v).split(".").map(Number); while (p.length < 3) p.push(0); return p; }
+function verAtLeast(a, b) { for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i]; return true; }
+function policyReleaseTs(id) {
+  if (!Array.isArray(RELEASE_ROWS) || !/^\d+\.\d+(\.\d+)?$/.test(POLICY_MIN[id] || "")) return null;
+  const min = verParts(POLICY_MIN[id]);
+  let best = null;
+  for (const r of RELEASE_ROWS) {
+    const ts = numOr(r && r.first_ts, null);
+    if (ts === null || ts <= 0 || typeof r.ua !== "string") continue;
+    const m = OFFICIAL_UA.exec(r.ua);
+    if (!m || m[2] || !verAtLeast(verParts(m[1]), min)) continue;
+    if (best === null || ts < best) best = ts;
+  }
+  return best;
+}
 const PC_PALETTE = ["var(--beacon)", "var(--signal)", "var(--warn)", "var(--crit)", "var(--ok)"];
 
 function pcColor(id, i, preFirst) { return id === "pre" ? "var(--text-3)" : PC_PALETTE[(i - (preFirst ? 1 : 0) + PC_PALETTE.length) % PC_PALETTE.length]; }
@@ -794,16 +838,16 @@ function drawPolicyChart() {
   let lines = "", markers = "", legend = [];
   ids.forEach((id, i) => {
     const col = pcColor(id, i, preFirst);
-    let dpath = "", markTs = null;
-    for (const p of pts) {
-      dpath += (dpath ? " L" : "M") + n1(X(p.ts)) + " " + n1(Y(shareAt(p, id)));
-      if (!markTs && id !== "pre" && shareAt(p, id) > 0) markTs = p.ts;
-    }
+    let dpath = "";
+    // Marker = when this policy's release first appeared, not when its bucket first went above
+    // zero (a lone release-candidate node would put that weeks too early).
+    const markTs = id === "pre" ? null : policyReleaseTs(id);
+    for (const p of pts) dpath += (dpath ? " L" : "M") + n1(X(p.ts)) + " " + n1(Y(shareAt(p, id)));
     const last = pts[pts.length - 1];
     lines += '<path class="pc-line" d="' + dpath + '" style="stroke:' + col + '"/>' +
       '<circle class="pc-dot" cx="' + n1(X(last.ts)) + '" cy="' + n1(Y(shareAt(last, id))) +
       '" r="3.5" style="fill:' + col + '"/>';
-    if (markTs && markTs > t0) {
+    if (markTs && markTs > t0 && markTs <= t1) {
       markers += '<line class="ch-mark" x1="' + n1(X(markTs)) + '" y1="' + padT + '" x2="' +
         n1(X(markTs)) + '" y2="' + n1(padT + ph) + '"/>';
     }
@@ -823,7 +867,8 @@ function drawPolicyChart() {
   const last = pts[pts.length - 1];
   $("pcCap").textContent = fmt(pts.length) + " samples, " + utcLabel(pts[0].ts) + " to " +
     utcLabel(last.ts) + ". Each node counted once, in the newest policy its software enforces; " +
-    "a lower bound measured by one crawler.";
+    "a lower bound measured by one crawler. Dashed lines mark the first time the crawler saw a " +
+    "final (non-candidate) build of each policy's release.";
 }
 
 let redrawPending = false;
@@ -878,14 +923,18 @@ if (donateCopy) {
 // Release adoption table: independent, hides its own section on any failure.
 fetch("releases.json?t=" + Date.now())
   .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-  .then(renderReleases)
+  .then(r => {
+    RELEASE_ROWS = Array.isArray(r) ? r : null;
+    renderReleases(r);
+    if (POLICY_SERIES) drawPolicyChart();   // the chart may have drawn before this arrived
+  })
   .catch(() => { $("releasesSection").hidden = true; });
 
 // Policy adoption chart needs the series plus id->label names from policies.json. The labels
 // fetch never blocks the chart: on any failure the ids fall back to readable defaults.
 fetch("policies.json?t=" + Date.now())
   .then(r => (r.ok ? r.json() : []))
-  .then(pol => { if (Array.isArray(pol)) for (const p of pol) if (p && p.id) POLICY_LABELS[p.id] = p.short || p.name || p.id; })
+  .then(pol => { if (Array.isArray(pol)) for (const p of pol) if (p && p.id) { POLICY_LABELS[p.id] = p.short || p.name || p.id; POLICY_MIN[p.id] = p.enforcing_min_version; } })
   .catch(() => {})
   .finally(() => fetch("policy-history.json?t=" + Date.now())
     .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })

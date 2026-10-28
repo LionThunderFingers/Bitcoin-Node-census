@@ -202,7 +202,7 @@ details.dt p+p{margin-top:9px}
 
   <div class="figures" aria-label="Key figures, updated hourly">
     <div class="fig lead"><div class="v num" id="figUp"></div>
-      <div class="k">post-fork nodes rated good</div><div class="note">by the seeder&rsquo;s own quality gate</div></div>
+      <div class="k" id="figUpK">post-fork nodes rated good</div><div class="note" id="figUpNote">by the seeder&rsquo;s own quality gate</div></div>
     <div class="fig"><div class="v num" id="figB2"></div>
       <div class="k">advertise the post-fork bit</div><div class="note">seen by the crawler</div></div>
     <div class="fig"><div class="v num" id="figCrawl"></div>
@@ -399,8 +399,9 @@ details.dt p+p{margin-top:9px}
              serves every block. A pruned node advertises only <code>NODE_NETWORK_LIMITED</code> and 
              serves roughly the last 288 blocks. This is read from the service bits each node 
              announces, so it is what a node says it can do, not something we tested. Pruned 
-             nodes are counted here but are not in the &ldquo;reachable nodes&rdquo; figure 
-             above, because the seeder only counts nodes that can serve full history as good.</p>
+             nodes are in the headline count, but not in the sections that use the seeder&rsquo;s 
+             rated-good set (versions, adoption, networks), because the seeder only rates a node good 
+             if it can serve full history.</p>
         </details>
       </div>
       <div class="bars" id="storageBars"></div>
