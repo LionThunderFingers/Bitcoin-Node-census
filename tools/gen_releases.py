@@ -2,20 +2,25 @@
 """Build the growing release-adoption table from census.jsonl.
 
 One row per canonical release ever seen:
-  {ua, first_ts, last_ts, peak_pct, peak_count, peak_ts, peak_basis, now_pct, now_count,
-   now_basis}
+  {ua, first_ts, last_ts, peak_pct, peak_count, peak_ts, now_pct, now_count,
+   nodes_peak, nodes_peak_ts, nodes_peak_pct, nodes_peak_basis,
+   nodes_now, nodes_now_pct, nodes_now_basis}
 
-Peak is the highest NODE COUNT a release ever reached, not the highest share: a share peak
+peak_* / now_* are the ORIGINAL fields and keep their original meaning, because other sites
+read this file: peak = highest share over rated-good (versions) samples with at least
+PEAK_FLOOR nodes; now = the latest such sample. Do not change them.
+
+nodes_peak is the highest NODE COUNT a release ever reached, not the highest share: a share peak
 moves when the denominator moves, so a release could "peak" at 90% of 70 nodes and never be
-shown the day it actually ran on 880. peak_count therefore has no floor. peak_pct is that
+shown the day it actually ran on 880. nodes_peak therefore has no floor. nodes_peak_pct is that
 sample's share, and it is null when the sample is below PEAK_FLOOR, so a handful of early
 nodes still cannot read as 100%.
 
-Each sample is counted on ONE of two bases, in this order:
+For nodes_*, each sample is counted on ONE of two bases, in this order:
   "storage"  -- versions_storage (per-version archival/pruned/other) summed per release,
                 over every fork node polled inside the crawler's freshness window;
   "versions" -- the older versions map, over the seeder's rated-good set only.
-The basis is recorded per row (peak_basis / now_basis) because the two populations differ:
+The basis is recorded per row (nodes_peak_basis / nodes_now_basis) because the two populations differ:
 the rated-good set excludes pruned nodes, so a release's count STEPS UP on the sample where
 the seed first publishes versions_storage. That is a measurement change, not adoption, and
 a row whose peak and now come from different bases says so rather than hiding it.
@@ -119,39 +124,90 @@ def _parse_samples(lines):
     return samples
 
 
+def _legacy_parse(lines):
+    """(ts, reach, counts) over the versions map only -- the original basis of releases.json."""
+    samples = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(rec, dict) or _as_int(rec.get("ts")) <= 0:
+            continue
+        got = _version_counts(rec)
+        if got:
+            samples.append((_as_int(rec["ts"]), got[0], got[1]))
+    samples.sort(key=lambda s: s[0])
+    return samples
+
+
 def build_releases(lines):
+    """peak_* / now_* keep their original meaning for external readers of releases.json
+    (xbtstats): highest SHARE over rated-good samples at or above PEAK_FLOOR, and the
+    rated-good share now. The page's node-count view is published alongside as nodes_*."""
+    lines = list(lines)
     samples = _parse_samples(lines)
-    if not samples:
+    legacy = _legacy_parse(lines)
+    if not samples and not legacy:
         return []
-    # "Now" comes from the latest sample whose population clears the floor, so a tiny or
-    # torn final sample cannot drive every release's current share to a misleading value.
-    now_ts, now_basis, now_denom, now_counts = next(
-        (s for s in reversed(samples) if s[2] >= PEAK_FLOOR), samples[-1])
 
     acc = {}  # ua -> aggregate
-    for ts, basis, denom, counts in samples:
-        for ua, count in counts.items():
-            a = acc.setdefault(ua, {
-                "ua": ua, "first_ts": ts, "last_ts": ts,
-                "peak_pct": None, "peak_count": None, "peak_ts": None, "peak_basis": None,
-                "now_pct": 0.0, "now_count": 0, "now_basis": now_basis,
-            })
-            a["first_ts"] = min(a["first_ts"], ts)
-            a["last_ts"] = max(a["last_ts"], ts)
-            # Strictly greater, so a count reached twice is dated to the FIRST time it was
-            # reached. peak_count has no floor; peak_pct is the share at that same sample
-            # and stays null below the floor, where a share is not meaningful.
-            if a["peak_count"] is None or count > a["peak_count"]:
-                a["peak_count"], a["peak_ts"], a["peak_basis"] = count, ts, basis
-                a["peak_pct"] = count / denom * 100.0 if denom >= PEAK_FLOOR else None
+
+    def row(ua, ts):
+        return acc.setdefault(ua, {
+            "ua": ua, "first_ts": ts, "last_ts": ts,
+            "peak_pct": None, "peak_count": None, "peak_ts": None,
+            "now_pct": 0.0, "now_count": 0,
+            "nodes_peak": None, "nodes_peak_ts": None, "nodes_peak_pct": None,
+            "nodes_peak_basis": None, "nodes_now": 0, "nodes_now_pct": 0.0,
+            "nodes_now_basis": None,
+        })
+
+    # Original fields, unchanged semantics.
+    if legacy:
+        _, l_reach, l_counts = next((s for s in reversed(legacy) if s[1] >= PEAK_FLOOR),
+                                    legacy[-1])
+        for ts, reach, counts in legacy:
+            for ua, count in counts.items():
+                a = row(ua, ts)
+                a["first_ts"] = min(a["first_ts"], ts)
+                a["last_ts"] = max(a["last_ts"], ts)
+                if reach >= PEAK_FLOOR:
+                    pct = count / reach * 100.0
+                    if a["peak_pct"] is None or pct > a["peak_pct"]:
+                        a["peak_pct"], a["peak_count"], a["peak_ts"] = pct, count, ts
+
+    # Node-count view. "Now" comes from the latest sample whose population clears the floor,
+    # so a tiny or torn final sample cannot drive every release's current share.
+    if samples:
+        _, now_basis, now_denom, now_counts = next(
+            (s for s in reversed(samples) if s[2] >= PEAK_FLOOR), samples[-1])
+        for ts, basis, denom, counts in samples:
+            for ua, count in counts.items():
+                a = row(ua, ts)
+                a["first_ts"] = min(a["first_ts"], ts)
+                a["last_ts"] = max(a["last_ts"], ts)
+                # Strictly greater, so a count reached twice is dated to the FIRST time it
+                # was reached. No floor on the count; the share stays null below the floor.
+                if a["nodes_peak"] is None or count > a["nodes_peak"]:
+                    a["nodes_peak"], a["nodes_peak_ts"], a["nodes_peak_basis"] = count, ts, basis
+                    a["nodes_peak_pct"] = count / denom * 100.0 if denom >= PEAK_FLOOR else None
 
     for ua, a in acc.items():
-        c = now_counts.get(ua, 0)
-        a["now_count"] = c
-        a["now_pct"] = c / now_denom * 100.0 if now_denom > 0 else 0.0
+        if legacy:
+            c = l_counts.get(ua, 0)
+            a["now_count"] = c
+            a["now_pct"] = c / l_reach * 100.0 if l_reach > 0 else 0.0
+        if samples:
+            c = now_counts.get(ua, 0)
+            a["nodes_now"], a["nodes_now_basis"] = c, now_basis
+            a["nodes_now_pct"] = c / now_denom * 100.0 if now_denom > 0 else 0.0
 
     rows = list(acc.values())
-    rows.sort(key=lambda r: (r["now_count"], r["peak_count"] or 0), reverse=True)
+    rows.sort(key=lambda r: (r["now_pct"], r["peak_pct"] or 0.0), reverse=True)
     return rows
 
 
@@ -176,30 +232,35 @@ def _run_self_test():
         failed += not ok
         print("%s  %-34s got %r want %r" % ("ok  " if ok else "FAIL", label, got, want))
 
-    # Peak is the node count, so A peaks at S2 (90 nodes) rather than at the sample with
-    # the highest share, and peak_pct is the share AT that sample.
-    check("A.peak_count (S2, 90 nodes)", rows[A]["peak_count"], 90)
-    check("A.peak_ts", rows[A]["peak_ts"], 2000)
-    check("A.peak_pct (90/100)", rows[A]["peak_pct"], 90.0)
-    check("A.peak_basis", rows[A]["peak_basis"], "versions")
-    # now ignores the sub-floor S4 (denominator 5) and uses S3: canonical variant merged
+    # --- original fields: exact pre-nodes_* semantics (external readers) ----------
+    check("A.peak_pct (S2 90/100)", rows[A]["peak_pct"], 90.0)
+    check("A.peak_count", rows[A]["peak_count"], 90)
+    # now ignores the sub-floor S4 (reach 5) and uses S3: canonical variant merged
     check("A.now_count (floor skips S4)", rows[A]["now_count"], 12)
     check("A.first_ts", rows[A]["first_ts"], 2000)
     check("A.last_ts", rows[A]["last_ts"], 4000)
     check("B.now_count", rows[B]["now_count"], 108)
     check("B.now_pct", round(rows[B]["now_pct"], 1), 90.0)
-    check("B.peak_count", rows[B]["peak_count"], 108)
-    check("B.peak_pct", round(rows[B]["peak_pct"], 1), 90.0)
-    # C seen only in a sub-floor sample: the count is real and is kept, the share is not
-    check("C.peak_count (no floor)", rows[C]["peak_count"], 5)
-    check("C.peak_pct null below floor", rows[C]["peak_pct"], None)
+    check("B.peak_pct", rows[B]["peak_pct"], 90.0)
+    # C seen only in a sub-floor sample -> legacy peak is null across the board, now is zero
+    check("C.peak_pct null", rows[C]["peak_pct"], None)
+    check("C.peak_count null", rows[C]["peak_count"], None)
     check("C.now_count", rows[C]["now_count"], 0)
     check("release count (A,B,C)", len(rows), 3)
-    # INVARIANT, same basis throughout: no release can be running on more nodes now than
-    # the most it ever ran on.
-    check("peak_count >= now_count (all rows)",
-          all(r["peak_count"] >= r["now_count"] for r in rows.values()), True)
-    check("one basis throughout", {r["now_basis"] for r in rows.values()}, {"versions"})
+
+    # --- nodes_*: peak is the node count, not the share ---------------------------
+    # Extra sample where the network is 10x larger: A's share is lower (50%) but its count
+    # is higher (500). Legacy keeps the 90% share peak; nodes_peak moves to 500.
+    big = {r["ua"]: r for r in build_releases(
+        FIX + ['{"ts":2500,"b2b_reachable":1000,"versions":{"%s":500,"%s":500}}' % (A, B)])}
+    check("legacy peak stays max share", (big[A]["peak_pct"], big[A]["peak_count"]), (90.0, 90))
+    check("nodes_peak is max count", (big[A]["nodes_peak"], big[A]["nodes_peak_ts"]), (500, 2500))
+    check("nodes_peak_pct share at that sample", big[A]["nodes_peak_pct"], 50.0)
+    check("C nodes_peak (no floor)", rows[C]["nodes_peak"], 5)
+    check("C nodes_peak_pct null below floor", rows[C]["nodes_peak_pct"], None)
+    check("nodes_peak >= nodes_now (all rows)",
+          all(r["nodes_peak"] >= r["nodes_now"] for r in big.values()), True)
+    check("one basis throughout", {r["nodes_now_basis"] for r in rows.values()}, {"versions"})
 
     # --- versions_storage basis -------------------------------------------------
     # Same releases, now with the per-version split published. The storage population
@@ -216,35 +277,35 @@ def _run_self_test():
         '"versions_storage":{"/Satoshi:29.4.2(vanity)/Knots:20260508/":{"archival":20,"pruned":20,"other":0},'
         '"%s":{"archival":40,"pruned":20,"other":0},'
         '"%s":{"archival":40,"pruned":20,"other":0}}}' % (A, B, A, B),
-        # BROKEN invariant (storage_pruned says 60, the split says 30): dropped entirely,
-        # and NOT re-read on the versions basis
+        # BROKEN invariant (storage_pruned says 60, the split says 30): dropped from nodes_*,
+        # and NOT re-read on the versions basis there
         '{"ts":7000,"b2b_reachable":100,"versions":{"%s":100},'
         '"storage_archival":100,"storage_pruned":60,"storage_other":0,'
         '"versions_storage":{"%s":{"archival":100,"pruned":30,"other":0}}}' % (A, A),
     ]
     srows = {r["ua"]: r for r in build_releases(VS)}
-    check("storage basis recorded", srows[A]["now_basis"], "storage")
+    check("storage basis recorded", srows[A]["nodes_now_basis"], "storage")
     # S6: A = (20+20) + (40+20) = 100 nodes; denominator 100 + 60 = 160
-    check("A storage now_count (merged)", srows[A]["now_count"], 100)
-    check("A storage peak_count", srows[A]["peak_count"], 100)
-    check("A storage peak_ts (S6)", srows[A]["peak_ts"], 6000)
-    check("A storage now_pct", round(srows[A]["now_pct"], 1), 62.5)
-    check("B storage now_count", srows[B]["now_count"], 60)
-    check("broken-invariant sample dropped", srows[A]["last_ts"], 6000)
-    check("peak_count >= now_count (storage)",
-          all(r["peak_count"] >= r["now_count"] for r in srows.values()), True)
-    # A series that spans the deploy: samples without versions_storage are still read on
-    # the versions basis, so the pre-deploy history is unaffected, and a row whose peak and
-    # now come from different populations reports both -- the page captions that step rather
-    # than presenting it as adoption. Here A ran on 90 rated-good nodes at ts 2000 and on 90
-    # recently-polled nodes at ts 5000: equal counts, different populations, so the peak
-    # stays on the FIRST sample that reached it.
+    check("A nodes_now (merged)", srows[A]["nodes_now"], 100)
+    check("A nodes_peak", srows[A]["nodes_peak"], 100)
+    check("A nodes_peak_ts (S6)", srows[A]["nodes_peak_ts"], 6000)
+    check("A nodes_now_pct", round(srows[A]["nodes_now_pct"], 1), 62.5)
+    check("B nodes_now", srows[B]["nodes_now"], 60)
+    # legacy fields ignore versions_storage entirely: S7's versions map is valid, so it is
+    # the legacy "now" (A 100/100), exactly as before versions_storage existed
+    check("legacy now ignores storage", (srows[A]["now_count"], srows[B]["now_count"]), (100, 0))
+    check("nodes_peak >= nodes_now (storage)",
+          all(r["nodes_peak"] >= r["nodes_now"] for r in srows.values()), True)
+    # A series that spans the deploy: a row whose peak and now come from different
+    # populations reports both, and the page captions that step rather than presenting it as
+    # adoption. A ran on 90 rated-good nodes at ts 2000 and on 90 recently-polled nodes at ts
+    # 5000: equal counts, so the peak stays on the FIRST sample that reached it.
     mixed = {r["ua"]: r for r in build_releases([FIX[3], VS[0]])}
     check("mixed series reports both bases",
-          (mixed[A]["peak_basis"], mixed[A]["now_basis"]), ("versions", "storage"))
-    check("mixed A peak_count", mixed[A]["peak_count"], 90)
+          (mixed[A]["nodes_peak_basis"], mixed[A]["nodes_now_basis"]), ("versions", "storage"))
+    check("mixed A nodes_peak", mixed[A]["nodes_peak"], 90)
     check("mixed B switches basis",
-          (mixed[B]["peak_basis"], mixed[B]["peak_count"]), ("storage", 50))
+          (mixed[B]["nodes_peak_basis"], mixed[B]["nodes_peak"]), ("storage", 50))
 
     print("\n%s" % ("ALL PASS" if not failed else "%d FAILED" % failed))
     return 1 if failed else 0

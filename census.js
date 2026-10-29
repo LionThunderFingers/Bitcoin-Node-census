@@ -520,9 +520,11 @@ function renderSoftware() {
   const dayOf = ts => { const t = numOr(ts, null);
     return t === null || t <= 0 ? DASH : dayLabel(new Date(t * 1000)); };
   const peakCell = r => {
-    const c = r ? numOr(r.peak_count, null) : null;
+    // nodes_* is the node-count view; peak_*/now_* keep their original share meaning for
+    // other readers of releases.json and are not used here.
+    const c = r ? numOr(r.nodes_peak, null) : null;
     if (c === null) return DASH;
-    const when = dayOf(r.peak_ts);
+    const when = dayOf(r.nodes_peak_ts);
     return fmt(c) + (when === DASH ? "" : " · " + when);
   };
 
@@ -565,8 +567,8 @@ function renderSoftware() {
     : []));
 
   // Caption: what the numbers are counted over, and the two honest caveats.
-  const mixed = [...rel.values()].some(r => r.peak_basis && r.now_basis &&
-    r.peak_basis !== r.now_basis);
+  const mixed = [...rel.values()].some(r => r.nodes_peak_basis && r.nodes_now_basis &&
+    r.nodes_peak_basis !== r.nodes_now_basis);
   const head = !basis
     ? "This sample publishes no per-release counts."
     : basis.kind === "storage"
@@ -593,7 +595,7 @@ function renderSoftware() {
   const GONE_CAP = 100;
   if (!gone.length) { wrap.hidden = true; return; }
   wrap.hidden = false;
-  gone.sort((a, b) => numOr(rel.get(b).peak_count, 0) - numOr(rel.get(a).peak_count, 0));
+  gone.sort((a, b) => numOr(rel.get(b).nodes_peak, 0) - numOr(rel.get(a).nodes_peak, 0));
   const shown = gone.slice(0, GONE_CAP);
   $("goneSummary").textContent = fmt(gone.length) +
     (gone.length === 1 ? " release no longer seen" : " releases no longer seen");
