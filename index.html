@@ -419,8 +419,13 @@ details.dt p+p{margin-top:9px}
         <table>
           <thead><tr><th scope="col">Distance from the highest block seen</th>
             <th scope="col" style="text-align:right">All</th>
-            <th scope="col" style="text-align:right">Enforcing</th>
-            <th scope="col" style="text-align:right">Not enforcing</th></tr></thead>
+            <!-- census.js names the rule these two columns are scored against, from
+                 data.policy.short: it is the rule in force NOW, which is not the one
+                 the software table and the activation block below count readiness for.
+                 The hardcoded text here is the fallback for a sample with no policy
+                 block. -->
+            <th scope="col" style="text-align:right" id="thHeightEnf">Enforcing</th>
+            <th scope="col" style="text-align:right" id="thHeightNot">Not enforcing</th></tr></thead>
           <tbody id="heightRows"></tbody>
         </table>
       </div>

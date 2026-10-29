@@ -47,12 +47,35 @@ let DATA = null;
 let RELEASE_ROWS = null;         // releases.json rows: first/last seen and peak per release
 let POLICY_LIST = null;          // policies.json, verbatim
 
-function showError(msg) {
+// One banner element, one styling, two headlines: a failure to load anything, and data
+// that loaded but is too old to read as current. head and msg both carry a thrown
+// Error's message or a data value, and a JSON parse failure quotes the response body
+// back inside it, so both are added as text, never as markup.
+function showBanner(head, msg) {
   const e = document.getElementById("err");
   e.style.display = "block";
-  // msg carries a thrown Error's message, and a JSON parse failure quotes the response
-  // body back inside it, so it is added as text, never as markup.
-  e.replaceChildren(el("strong", null, "Could not load the latest figures."), " " + String(msg));
+  e.replaceChildren(el("strong", null, head), " " + String(msg));
+}
+function showError(msg) {
+  showBanner("Could not load the latest figures.", msg);
+}
+
+// How old data.json has to be before the page says so, measured against the viewer's own
+// clock. The publisher runs hourly, and a sample is already up to an hour old when it is
+// written, so 2.5h is comfortably clear of normal lag and still catches a stalled
+// publisher within three cycles. A viewer clock running behind gives a negative age and
+// never trips this.
+const STALE_AFTER_SECONDS = 2.5 * 3600;
+// The data stays on the page: it is real, it is just old, and a blank page would hide the
+// one thing the reader needs to judge it. The stamp in the masthead says the same time;
+// this says it in the place people actually look when a figure surprises them.
+function checkStaleness(ts) {
+  const age = Math.floor(Date.now() / 1000) - ts;
+  if (!(age > STALE_AFTER_SECONDS)) return;
+  const hours = Math.round(age / 3600);
+  showBanner("These figures may be out of date.",
+    "They are from " + utcLabel(ts) + ", " + hours + " hour" + (hours === 1 ? "" : "s") +
+    " ago. The census normally updates hourly, so publishing may be delayed.");
 }
 
 // Headline: every post-fork node that answered the crawler recently, archival AND pruned.
@@ -83,6 +106,7 @@ function render(d) {
   const stampTs = numOr(d.ts, null);
   document.getElementById("stamp").textContent = stampTs === null ? DASH
     : new Date(stampTs * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+  if (stampTs !== null) checkStaleness(stampTs);
   renderHeadlineCount(d);
   document.getElementById("figB2").textContent = fmtOr(d.b2b);
   document.getElementById("figCrawl").textContent = fmtOr(d.total);
@@ -246,6 +270,20 @@ function renderHeights(d) {
   const grp = k => (hbe && hbe[k] && typeof hbe[k] === "object" && !Array.isArray(hbe[k]))
     ? hbe[k] : null;
   const en = grp("enforcing"), ne = grp("not_enforcing");
+
+  // heights_by_enforcement is scored by the publisher against the policy IN FORCE at this
+  // sample (data.policy), while the software table and the activation section below count
+  // readiness for the NEXT one. Two different rules, so these two columns name theirs
+  // rather than saying a bare "Enforcing" that the reader has to guess at. Falls back to
+  // the text in index.html for a sample published before data.policy existed.
+  const pol = obj(d.policy);
+  const polShort = (pol && typeof pol.short === "string" && pol.short.trim())
+    ? pol.short.trim() : null;
+  const thEnf = $("thHeightEnf"), thNot = $("thHeightNot");
+  if (polShort) {
+    if (thEnf) thEnf.textContent = "Enforcing " + polShort;
+    if (thNot) thNot.textContent = "Not enforcing " + polShort;
+  }
   // An absent group renders as an em-dash, never as a zero: "not published" and
   // "published as none" are different claims.
   const cell = (g, k) => g ? fmtOr(g[k]) : DASH;
@@ -298,7 +336,11 @@ function renderHeights(d) {
     ? "Counts the post-fork nodes the seeder rates good"
     : "Counts the " + fmt(good) + " post-fork nodes the seeder rates good") +
     ", which excludes pruned nodes, not the wider recently-polled base used by the software " +
-    "table above.";
+    "table above. The enforcing split here is against " +
+    (polShort ? "the " + polShort + " rule, which is in force now" :
+      "the rule in force now") +
+    ", while the activation section below counts readiness for the next rule, so the two " +
+    "enforcing figures on this page are not the same measurement.";
 }
 
 // ---- Two context tiles: post-fork share of the crawl, and measurement freshness ----
@@ -799,7 +841,20 @@ window.addEventListener("resize", () => {
 // Cache-bust so a refresh shows the newest push rather than a cached copy.
 fetch("data.json?t=" + Date.now())
   .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-  .then(render)
+  // A file that is valid JSON but not a census sample -- [] or {}, a half-written file,
+  // or something else served from this path -- used to render an entirely blank page
+  // with no banner, which reads as "the network is empty" rather than "this is broken".
+  // The timestamp is the test because every figure on the page is only meaningful as of
+  // one: no usable ts means nothing below can be trusted either.
+  .then(d => {
+    if (!obj(d) || numOr(d.ts, null) === null) {
+      showError("The census file loaded but is not a census sample: it has no usable " +
+        "timestamp, so none of the figures below would mean anything. The publisher on " +
+        "the seed host may have written a partial file.");
+      return;
+    }
+    render(d);
+  })
   .catch(e => showError("The census file could not be fetched (" + e.message +
     "). The page itself is fine; the publisher on the seed host may not have run yet."));
 
