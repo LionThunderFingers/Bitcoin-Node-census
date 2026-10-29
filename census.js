@@ -749,9 +749,12 @@ function drawPolicyChart() {
     // Marker = when this policy's release first appeared, not when its bucket first went above
     // zero (a lone release-candidate node would put that weeks too early).
     const markTs = id === "pre" ? null : policyReleaseTs(id);
-    for (const p of pts) dpath += (dpath ? " L" : "M") + n1(X(p.ts)) + " " + n1(Y(shareAt(p, id)));
+    // A policy's line starts at the first sample with a node in it; a flat 0% before that would
+    // read as "available all along, unused". The pre-fork bucket runs from the start.
+    const from = id === "pre" ? 0 : pts.findIndex(p => numOr(p.buckets[id], 0) > 0);
+    if (from >= 0) for (const p of pts.slice(from)) dpath += (dpath ? " L" : "M") + n1(X(p.ts)) + " " + n1(Y(shareAt(p, id)));
     const last = pts[pts.length - 1];
-    lines += '<path class="pc-line" d="' + dpath + '" style="stroke:' + col + '"/>' +
+    if (dpath) lines += '<path class="pc-line" d="' + dpath + '" style="stroke:' + col + '"/>' +
       '<circle class="pc-dot" cx="' + n1(X(last.ts)) + '" cy="' + n1(Y(shareAt(last, id))) +
       '" r="3.5" style="fill:' + col + '"/>';
     if (markTs && markTs > t0 && markTs <= t1) {
