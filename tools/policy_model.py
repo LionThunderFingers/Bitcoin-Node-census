@@ -123,6 +123,98 @@ def current_policy(policies, max_height):
     return activated[-1] if activated else None
 
 
+def next_policy(policies, max_height):
+    """The first epoch that has NOT activated yet at max_height, i.e. the lowest activation
+    strictly greater than it; None once the last epoch has activated.
+
+    Strictly greater, not >=: at exactly the activation height the rule is already in force
+    (current_policy returns it), so a countdown to it would read "0 blocks remaining" for a
+    rule that is live. The page needs the two to be mutually exclusive.
+    """
+    for p in sorted(policies, key=lambda x: x["activation"]):
+        if p["activation"] > max_height:
+            return p
+    return None
+
+
+# --- per-version storage split --------------------------------------------------
+_STORAGE_KEYS = ("archival", "pruned", "other")
+
+
+def _as_int(value):
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def merge_versions_storage(raw):
+    """versions_storage from a census line, with its keys canonicalized the same way
+    d["versions"] is, counts summed on collision.
+
+    Returns {} for anything that is not a dict, and skips entries that are not dicts, so a
+    torn line degrades to "this sample has no split" rather than to fabricated zeros. Only
+    the three known sub-keys are kept: an unknown one would silently leave the archival +
+    pruned + other == total invariant the page relies on.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for ua, buckets in raw.items():
+        if not isinstance(buckets, dict):
+            continue
+        key = canonicalize(str(ua))
+        slot = out.setdefault(key, {k: 0 for k in _STORAGE_KEYS})
+        for k in _STORAGE_KEYS:
+            slot[k] += _as_int(buckets.get(k))
+    return out
+
+
+def storage_total(buckets):
+    """archival + pruned + other of one versions_storage entry."""
+    if not isinstance(buckets, dict):
+        return 0
+    return sum(_as_int(buckets.get(k)) for k in _STORAGE_KEYS)
+
+
+# --- what data.json publishes about the policies ---------------------------------
+def policy_summary(policy):
+    """The naming half of a policy epoch, for the page's section titles. Deliberately
+    without min_version: the page must never re-derive enforcement from a version number
+    in JS, only read the generated enforcing list.
+    """
+    if not policy:
+        return None
+    return {"id": policy["id"], "name": policy["name"], "short": policy["short"]}
+
+
+def enforcing_versions(uas, min_version):
+    """Every user agent in uas that classifies as enforcing at min_version, sorted for a
+    stable diff between runs."""
+    return sorted(ua for ua in uas if classify_enforcing(ua, min_version))
+
+
+def next_policy_block(policies, max_height, uas):
+    """data.json's next_policy: the epoch that has not activated yet at max_height, with
+    the readiness list scored against ITS minimum version over the same user agents the
+    sample publishes. None once the last epoch has activated.
+
+    enforcing_versions is generated here rather than left to the page because the page
+    must not parse version numbers out of user-agent strings -- that is the one piece of
+    consensus-sensitive classification, and it has exactly one home.
+    """
+    p = next_policy(policies, max_height)
+    if not p:
+        return None
+    out = policy_summary(p)
+    out.update({
+        "activation": p["activation"],
+        "end": p["end"],
+        "enforcing_versions": enforcing_versions(uas, p["min_version"]),
+    })
+    return out
+
+
 # --- self-test ------------------------------------------------------------------
 def _run_self_test():
     failed = 0
@@ -164,6 +256,51 @@ def _run_self_test():
     check("h=979920 -> m180", current_policy(POL, 979920)["id"], "m180")
     check("h=2000000 -> m180", current_policy(POL, 2000000)["id"], "m180")
     check("h=900000 -> None", current_policy(POL, 900000), None)
+    # next_policy: the countdown target. Mutually exclusive with current_policy at every
+    # height, and absent once the last epoch has activated.
+    check("next h=900000 -> m45", next_policy(POL, 900000)["id"], "m45")
+    check("next h=973439 -> m45", next_policy(POL, 973439)["id"], "m45")
+    check("next h=973440 -> m180", next_policy(POL, 973440)["id"], "m180")
+    check("next h=979919 -> m180", next_policy(POL, 979919)["id"], "m180")
+    check("next h=979920 -> None", next_policy(POL, 979920), None)
+    check("next h=2000000 -> None", next_policy(POL, 2000000), None)
+    check("next != current at h=973440",
+          next_policy(POL, 973440)["id"] != current_policy(POL, 973440)["id"], True)
+    # versions_storage: canonical merge, and the per-entry total the page sums
+    VS = merge_versions_storage({
+        "/Satoshi:29.4.2/Knots:20260508/": {"archival": 5, "pruned": 2, "other": 0},
+        "/Satoshi:29.4.2(vanity)/Knots:20260508/": {"archival": 1, "pruned": 3},
+        "/OracleKnots:29.4.3/OracleKnots:20260508/": {"other": 4},
+        "/Satoshi:29.4.1/Knots:20260508/": "not a dict",
+    })
+    check("vs canonical merge", VS["/Satoshi:29.4.2/Knots:20260508/"],
+          {"archival": 6, "pruned": 5, "other": 0})
+    check("vs missing sub-key -> 0", VS["/OracleKnots:29.4.3/OracleKnots:20260508/"],
+          {"archival": 0, "pruned": 0, "other": 4})
+    check("vs non-dict entry dropped", "/Satoshi:29.4.1/Knots:20260508/" in VS, False)
+    check("vs merge preserves the sum", sum(storage_total(v) for v in VS.values()), 15)
+    check("vs row count after merge", len(VS), 2)
+    check("vs not a dict -> {}", merge_versions_storage(None), {})
+    check("storage_total of junk", storage_total("x"), 0)
+    # next_policy_block: what data.json publishes for the countdown. The user-agent set is
+    # the union of versions and versions_storage keys, as seed-publish assembles it.
+    UAS = ["/Satoshi:29.4.1/Knots:20260508/", "/Satoshi:29.4.2/Knots:20260508/",
+           "/Satoshi:29.5.0/Knots:20270101/", "/OracleKnots:29.5.0/OracleKnots:20270101/"]
+    NB = next_policy_block(POL, 973440, UAS)
+    check("next block id", NB["id"], "m180")
+    check("next block activation", NB["activation"], 979920)
+    check("next block end", NB["end"], 1005840)
+    # scored at m180's own minimum (29.5.0), so 29.4.2 is NOT ready for it, and the
+    # renamed fork never is
+    check("next block enforcing", NB["enforcing_versions"], ["/Satoshi:29.5.0/Knots:20270101/"])
+    check("next block has no min_version", "min_version" in NB, False)
+    check("next block before any activation", next_policy_block(POL, 900000, UAS)["id"], "m45")
+    check("next block after the last", next_policy_block(POL, 979920, UAS), None)
+    check("current summary", policy_summary(current_policy(POL, 979919)),
+          {"id": "m45", "name": "45d", "short": "45d"})
+    check("summary of None", policy_summary(None), None)
+    check("enforcing list sorted + filtered", enforcing_versions(UAS, _version_tuple("29.4.2")),
+          ["/Satoshi:29.4.2/Knots:20260508/", "/Satoshi:29.5.0/Knots:20270101/"])
     # validation failures
     expect_raises("empty list", lambda: parse_policies("[]"))
     expect_raises("not a list", lambda: parse_policies('{"id":"x"}'))
