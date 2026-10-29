@@ -811,17 +811,17 @@ fetch("stable-nodes.json?t=" + Date.now())
 
 // Donate: copy the address to the clipboard. Independent of every fetch above, so it works
 // even if the census file never loads. The address is read from the button's own data
-// attribute, so a copy never depends on how the <code> element happened to render.
-const donateCopy = $("donateCopy");
-if (donateCopy) {
-  donateCopy.addEventListener("click", () => {
-    const addr = donateCopy.getAttribute("data-addr") || "";
+// attribute, so a copy never depends on how the <code> element happened to render. Covers
+// both the strip under the figures and the full section at the bottom.
+for (const btn of document.querySelectorAll("button.donate-copy")) {
+  btn.addEventListener("click", () => {
+    const addr = btn.getAttribute("data-addr") || "";
     if (!navigator.clipboard) return;
     navigator.clipboard.writeText(addr).then(() => {
-      const prev = donateCopy.textContent;
-      donateCopy.textContent = "Copied";
-      donateCopy.classList.add("done");
-      setTimeout(() => { donateCopy.textContent = prev; donateCopy.classList.remove("done"); }, 1600);
+      const prev = btn.textContent;
+      btn.textContent = "Copied";
+      btn.classList.add("done");
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove("done"); }, 1600);
     }).catch(() => {});
   });
 }
