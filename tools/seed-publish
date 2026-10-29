@@ -99,11 +99,11 @@ run_py() {
 # height of a sample that measured nothing. This is the same shape of guard as the
 # rows >= 10 floor on seeds.txt below, applied to the live figure.
 #
-# Two absolute floors and one relative one. The relative floor compares against the
-# data.json that is published RIGHT NOW: the clone is hard-reset to origin/main before
-# the generator runs, so the file still on disk when this is called is exactly the
-# committed one. It is skipped when there is no previous file or it does not parse, so a
-# first run against a fresh repo still works.
+# Two absolute floors, one relative one, and a forward-only check on ts. The three that
+# compare against the past compare against the data.json that is published RIGHT NOW: the
+# clone is hard-reset to origin/main before the generator runs, so the file still on disk
+# when this is called is exactly the committed one. They are skipped when there is no
+# previous file or it does not parse, so a first run against a fresh repo still works.
 #
 # A refusal exits non-zero and the caller removes the candidate file, so nothing is
 # moved into place, nothing is staged and nothing is committed.
@@ -156,6 +156,28 @@ if old is not None:
     if previous > 0 and reachable < previous * MIN_SHARE_OF_PREVIOUS:
         problems.append("b2b_reachable is %d, under %d%% of the %d currently published"
                         % (reachable, int(MIN_SHARE_OF_PREVIOUS * 100), previous))
+
+    # Time must move FORWARD. Nothing else stops data.json going backwards: a census.jsonl
+    # restored from an old backup, a rolled-back clone, or a host whose clock jumped back
+    # all produce a structurally valid sample that every check above accepts, and the page
+    # would then present an older measurement as the current one -- while the staleness
+    # banner, which is measured against the viewer's clock, would say nothing, because the
+    # republished sample is genuinely stamped in the past.
+    #
+    # Equal is refused as well as older: an identical ts is the same sample, so there is
+    # nothing new to publish, and republishing it would only churn the commit history.
+    #
+    # Skipped entirely when the published file has no usable ts (a first run, a file
+    # written before ts existed, or an unparseable one -- load() already returned None for
+    # the last of those), so a fresh repository still publishes.
+    previous_ts = as_int(old.get("ts"))
+    new_ts = as_int(new.get("ts"))
+    if previous_ts > 0 and new_ts <= previous_ts:
+        problems.append(
+            "the new sample's ts is %d, which is not newer than the %d already published "
+            "(%d seconds %s). Publishing it would move the page backwards in time."
+            % (new_ts, previous_ts, abs(previous_ts - new_ts),
+               "older" if new_ts < previous_ts else "apart, i.e. the same sample"))
 
 for problem in problems:
     print("refusing to publish: %s" % problem, file=sys.stderr)
@@ -241,9 +263,10 @@ print("%d/%d passed" % (len(CASES) + 1 - failed, len(CASES) + 1))
 sys.exit(1 if failed else 0)
 PY
     rc=$?
-    # Also run the shared tools' own self-tests (policy model + the two generators), so one
-    # --self-test proves every consensus-sensitive path. Requires the clone to be present.
-    for _m in policy_model gen_releases gen_policy_history; do
+    # Also run the shared tools' own self-tests (policy model, the two generators and the
+    # stable-list window rule), so one --self-test proves every consensus-sensitive path.
+    # Requires the clone to be present.
+    for _m in policy_model gen_releases gen_policy_history seed-stable; do
         if [ -f "$TOOLS/$_m.py" ]; then
             echo "--- $_m ---"
             python3 "$TOOLS/$_m.py" --self-test || rc=1
@@ -305,6 +328,21 @@ PY
         '{"b2b_reachable":260,"b2b_polled_recently":1200}' "$SF_GOOD"
     sf_case "the two counts are missing"         expect-refuse '{}' MISSING
     sf_case "a JSON array, not an object"        expect-refuse '[]' MISSING
+    # Forward-only ts. SF_GOOD carries no ts at all, so every case above is unaffected by
+    # the check and that is itself worth asserting (the first case below).
+    SF_TS='{"b2b_reachable":1000,"b2b_polled_recently":1200,"ts":2000}'
+    sf_case "no ts on either side is not checked" expect-pass  "$SF_GOOD" "$SF_GOOD"
+    sf_case "a newer ts publishes"               expect-pass \
+        '{"b2b_reachable":1000,"b2b_polled_recently":1200,"ts":2001}' "$SF_TS"
+    sf_case "an older ts is refused"             expect-refuse \
+        '{"b2b_reachable":1000,"b2b_polled_recently":1200,"ts":1999}' "$SF_TS"
+    sf_case "the same ts is refused"             expect-refuse "$SF_TS" "$SF_TS"
+    sf_case "a missing ts against a published one is refused" expect-refuse \
+        "$SF_GOOD" "$SF_TS"
+    sf_case "an unparseable ts against a published one is refused" expect-refuse \
+        '{"b2b_reachable":1000,"b2b_polled_recently":1200,"ts":"soon"}' "$SF_TS"
+    sf_case "no published ts, so no check"       expect-pass  "$SF_TS" "$SF_GOOD"
+    sf_case "first run with a ts"                expect-pass  "$SF_TS" MISSING
     [ "$sf_fail" -eq 0 ] || rc=1
     exit $rc
 fi
@@ -598,7 +636,13 @@ else
     START="$(date -d "$(systemctl show lionseed -p ActiveEnterTimestamp --value)" +%s 2>/dev/null || echo 0)"
 fi
 if [ -f "$DUMP" ] && command -v seed-stable >/dev/null; then
-    if seed-stable "$DUMP" "$START" > stable-nodes.json.new 2>/dev/null \
+    # seed-stable's stderr is NOT discarded: it warns there when START is 0, i.e. when the
+    # qualifying rule has silently fallen back to the weakest (2h) window, and that warning
+    # is only useful if the operator can see it in the unit's log. A traceback from a real
+    # failure is worth seeing for the same reason. The fallback below is unchanged and still
+    # driven by the exit status, so a failed seed-stable keeps the previous file exactly as
+    # it did before.
+    if seed-stable "$DUMP" "$START" > stable-nodes.json.new \
        && python3 -I -m json.tool stable-nodes.json.new >/dev/null 2>&1; then
         mv stable-nodes.json.new stable-nodes.json
     else
