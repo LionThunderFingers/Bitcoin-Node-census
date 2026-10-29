@@ -173,7 +173,7 @@ Each entry in `nodes` / `all_reachable`:
 
 ### seeds.txt
 
-The post-fork rows of the seeder's dump, in the `dnsseed.dump` text format that Knots' `contrib/seeds/makeseeds.py` reads. Line 1 is a `#` header; then one row per **known** post-fork node (good or not), whitespace-separated, good rows first, then by 30-day uptime.
+The post-fork rows of the seeder's dump, in the `dnsseed.dump` text format that Knots' `contrib/seeds/makeseeds.py` reads. Line 1 is a `#` header; then one row per **known** post-fork node (good or not), whitespace-separated, good rows first, then by the seeder's internal 30-day reliability. That ordering uses the figure before the scaling described under `%(30d)` below, so the printed column can look out of order.
 
 | Column | Meaning |
 |---|---|
@@ -203,7 +203,7 @@ Validation rules (strictly increasing activation and minimum version, no overlap
 
 ## Privacy
 
-The JSON files carry only aggregates, except `stable-nodes.json`, which lists addresses with uptime but no software version. `seeds.txt` lists the addresses of post-fork nodes that accept incoming connections, which is what any crawler or DNS seed already sees and hands out. Addresses of non-post-fork nodes are not published.
+The JSON files carry only aggregates, except `stable-nodes.json`, which lists addresses with uptime but no software version. `seeds.txt` lists the addresses of post-fork nodes that accept incoming connections: addresses any crawler can find, with the details each node reports about itself in its handshake. It goes further than a DNS seed's answers in three ways: it includes per-node uptime figures, it includes nodes that are not currently rated good, and git history keeps every hourly version. Addresses of non-post-fork nodes are not published.
 
 ## Credit
 
