@@ -177,6 +177,44 @@ def storage_total(buckets):
     return sum(_as_int(buckets.get(k)) for k in _STORAGE_KEYS)
 
 
+# --- what data.json publishes about the policies ---------------------------------
+def policy_summary(policy):
+    """The naming half of a policy epoch, for the page's section titles. Deliberately
+    without min_version: the page must never re-derive enforcement from a version number
+    in JS, only read the generated enforcing list.
+    """
+    if not policy:
+        return None
+    return {"id": policy["id"], "name": policy["name"], "short": policy["short"]}
+
+
+def enforcing_versions(uas, min_version):
+    """Every user agent in uas that classifies as enforcing at min_version, sorted for a
+    stable diff between runs."""
+    return sorted(ua for ua in uas if classify_enforcing(ua, min_version))
+
+
+def next_policy_block(policies, max_height, uas):
+    """data.json's next_policy: the epoch that has not activated yet at max_height, with
+    the readiness list scored against ITS minimum version over the same user agents the
+    sample publishes. None once the last epoch has activated.
+
+    enforcing_versions is generated here rather than left to the page because the page
+    must not parse version numbers out of user-agent strings -- that is the one piece of
+    consensus-sensitive classification, and it has exactly one home.
+    """
+    p = next_policy(policies, max_height)
+    if not p:
+        return None
+    out = policy_summary(p)
+    out.update({
+        "activation": p["activation"],
+        "end": p["end"],
+        "enforcing_versions": enforcing_versions(uas, p["min_version"]),
+    })
+    return out
+
+
 # --- self-test ------------------------------------------------------------------
 def _run_self_test():
     failed = 0
@@ -244,6 +282,25 @@ def _run_self_test():
     check("vs row count after merge", len(VS), 2)
     check("vs not a dict -> {}", merge_versions_storage(None), {})
     check("storage_total of junk", storage_total("x"), 0)
+    # next_policy_block: what data.json publishes for the countdown. The user-agent set is
+    # the union of versions and versions_storage keys, as seed-publish assembles it.
+    UAS = ["/Satoshi:29.4.1/Knots:20260508/", "/Satoshi:29.4.2/Knots:20260508/",
+           "/Satoshi:29.5.0/Knots:20270101/", "/OracleKnots:29.5.0/OracleKnots:20270101/"]
+    NB = next_policy_block(POL, 973440, UAS)
+    check("next block id", NB["id"], "m180")
+    check("next block activation", NB["activation"], 979920)
+    check("next block end", NB["end"], 1005840)
+    # scored at m180's own minimum (29.5.0), so 29.4.2 is NOT ready for it, and the
+    # renamed fork never is
+    check("next block enforcing", NB["enforcing_versions"], ["/Satoshi:29.5.0/Knots:20270101/"])
+    check("next block has no min_version", "min_version" in NB, False)
+    check("next block before any activation", next_policy_block(POL, 900000, UAS)["id"], "m45")
+    check("next block after the last", next_policy_block(POL, 979920, UAS), None)
+    check("current summary", policy_summary(current_policy(POL, 979919)),
+          {"id": "m45", "name": "45d", "short": "45d"})
+    check("summary of None", policy_summary(None), None)
+    check("enforcing list sorted + filtered", enforcing_versions(UAS, _version_tuple("29.4.2")),
+          ["/Satoshi:29.4.2/Knots:20260508/", "/Satoshi:29.5.0/Knots:20270101/"])
     # validation failures
     expect_raises("empty list", lambda: parse_policies("[]"))
     expect_raises("not a list", lambda: parse_policies('{"id":"x"}'))

@@ -81,6 +81,8 @@ sys.path.insert(0, os.environ.get("TOOLS", ""))
 from policy_model import (  # noqa: F401
     _OFFICIAL_KNOTS_UA, _version_tuple, parse_min_version,
     classify_enforcing, canonicalize, parse_policies, current_policy,
+    next_policy, next_policy_block, policy_summary, enforcing_versions,
+    merge_versions_storage, storage_total,
 )
 PY
 
@@ -175,6 +177,18 @@ PY
             rc=1
         fi
     done
+    # seed-census is installed on PATH, not in $TOOLS (it is a bash script, not a shared
+    # module), so it is resolved rather than assumed. Its self-test is the only place the
+    # versions_storage sum invariant -- archival/pruned/other per user agent adding up to
+    # storage_* and to b2b_polled_recently -- is checked against the real awk.
+    SEED_CENSUS="${SEED_CENSUS:-$(command -v seed-census 2>/dev/null)}"
+    if [ -n "$SEED_CENSUS" ] && [ -x "$SEED_CENSUS" ]; then
+        echo "--- seed-census ---"
+        "$SEED_CENSUS" --self-test || rc=1
+    else
+        echo "self-test: seed-census not found on PATH (set SEED_CENSUS=/path/to/seed-census)" >&2
+        rc=1
+    fi
     exit $rc
 fi
 
@@ -211,7 +225,8 @@ d = json.loads(last)
 # The policy in force at the current tip (or the earliest, before any activation) drives the
 # activation window and which releases count as enforcing -- one policies.json edit moves all
 # of it, so the activation section and the enforcement split can never disagree.
-cur = current_policy(policies, int(d.get("max_height") or 0)) or policies[0]
+max_height = int(d.get("max_height") or 0)
+cur = current_policy(policies, max_height) or policies[0]
 min_version = cur["min_version"]
 d["activation_height"] = cur["activation"]
 d["activation_end_height"] = cur["end"]
@@ -231,15 +246,37 @@ if isinstance(raw_versions, dict):
         merged[canonicalize(ua)] = merged.get(canonicalize(ua), 0) + n
     d["versions"] = merged
 
+# versions_storage (the per-version archival/pruned split, over the recently-polled
+# population rather than the rated-good one) gets the SAME canonical treatment, counts
+# summed on collision, so the page can key one table by both fields. Absent in census
+# lines written before it existed: the key is then left out entirely rather than written
+# as an empty object, so the page can tell "no split published" from "a split of zero".
+raw_storage = d.get("versions_storage")
+if isinstance(raw_storage, dict):
+    d["versions_storage"] = merge_versions_storage(raw_storage)
+
 # The page decides enforcement by exact string lookup in this list against the keys of
 # d["versions"]. Generate it from the classifier over every user agent this sample
-# publishes (the merged versions keys plus the raw heights_by_version keys), so the
-# page and the split below always agree. Sorted for a stable diff between runs.
+# publishes (the merged versions keys, the merged versions_storage keys, and the raw
+# heights_by_version keys), so the page and the split below always agree. The
+# versions_storage keys matter: that population includes pruned nodes, which are never
+# rated good and so never appear in versions -- without them a pruned node on an
+# enforcing release would be counted as not enforcing. Additive: the list can only gain
+# entries, and an entry already in it is classified identically.
+# Sorted for a stable diff between runs.
 seen = set()
-for field in ("versions", "heights_by_version"):
+for field in ("versions", "versions_storage", "heights_by_version"):
     if isinstance(d.get(field), dict):
         seen.update(d[field].keys())
-d["enforcing_versions"] = sorted(ua for ua in seen if classify_enforcing(ua, min_version))
+d["enforcing_versions"] = enforcing_versions(seen, min_version)
+
+# Which policy those heights and that enforcing list belong to, by name, plus the next one
+# to activate. The page titles its activation section from these instead of hardcoding a
+# rule name, and scores readiness for the NEXT rule from next_policy.enforcing_versions.
+# next_policy is null once the last epoch in policies.json has activated; the page then
+# falls back to describing the current one.
+d["policy"] = policy_summary(cur)
+d["next_policy"] = next_policy_block(policies, max_height, seen)
 
 d["heights"] = {
     "tip": d.pop("h_tip", 0), "near": d.pop("h_near", 0),
