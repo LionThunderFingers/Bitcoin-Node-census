@@ -88,7 +88,7 @@ PY
 
 # Feed COMMON_PY followed by the caller's heredoc to python3 on stdin.
 run_py() {
-    { printf '%s\n' "$COMMON_PY"; cat; } | python3 - "$@"
+    { printf '%s\n' "$COMMON_PY"; cat; } | python3 -I - "$@"
 }
 
 # Sanity floor on the generated sample, checked BEFORE anything is written or staged.
@@ -108,7 +108,7 @@ run_py() {
 # A refusal exits non-zero and the caller removes the candidate file, so nothing is
 # moved into place, nothing is staged and nothing is committed.
 sanity_check() {  # <generated data.json> <currently published data.json>
-    python3 - "$1" "$2" <<'PY'
+    python3 -I - "$1" "$2" <<'PY'
 import json, sys
 
 new_path, old_path = sys.argv[1], sys.argv[2]
@@ -463,7 +463,7 @@ if [ ! -s data.json.new ]; then
     rm -f data.json.new
     exit 1
 fi
-python3 -m json.tool data.json.new >/dev/null 2>&1 || {
+python3 -I -m json.tool data.json.new >/dev/null 2>&1 || {
     echo "generated data.json is not valid JSON, refusing to publish" >&2
     rm -f data.json.new; exit 1
 }
@@ -562,7 +562,7 @@ if [ ! -s history.json.new ]; then
     rm -f history.json.new
     exit 1
 fi
-python3 -m json.tool history.json.new >/dev/null 2>&1 || {
+python3 -I -m json.tool history.json.new >/dev/null 2>&1 || {
     echo "generated history.json is not valid JSON, refusing to publish" >&2
     rm -f history.json.new; exit 1
 }
@@ -576,7 +576,7 @@ mv history.json.new history.json
 gen_one() {  # <script> <out> <args...>
     _script="$1"; _out="$2"; shift 2
     if python3 "$TOOLS/$_script" "$@" > "$_out.new" 2>/dev/null \
-       && python3 -m json.tool "$_out.new" >/dev/null 2>&1; then
+       && python3 -I -m json.tool "$_out.new" >/dev/null 2>&1; then
         mv "$_out.new" "$_out"
     else
         echo "$_out generation failed, keeping the previous file" >&2
@@ -599,7 +599,7 @@ else
 fi
 if [ -f "$DUMP" ] && command -v seed-stable >/dev/null; then
     if seed-stable "$DUMP" "$START" > stable-nodes.json.new 2>/dev/null \
-       && python3 -m json.tool stable-nodes.json.new >/dev/null 2>&1; then
+       && python3 -I -m json.tool stable-nodes.json.new >/dev/null 2>&1; then
         mv stable-nodes.json.new stable-nodes.json
     else
         echo "stable-nodes generation failed, keeping the previous file" >&2
