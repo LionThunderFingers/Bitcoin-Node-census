@@ -205,6 +205,12 @@ Validation rules (strictly increasing activation and minimum version, no overlap
 
 The JSON files carry only aggregates, except `stable-nodes.json`, which lists addresses with uptime but no software version. `seeds.txt` lists the addresses of post-fork nodes that accept incoming connections: addresses any crawler can find, with the details each node reports about itself in its handshake. It goes further than a DNS seed's answers in three ways: it includes per-node uptime figures, it includes nodes that are not currently rated good, and git history keeps every hourly version. Addresses of non-post-fork nodes are not published.
 
+## Support
+
+The seed and census run on a VPS paid out of pocket. If you find the data useful, donations are welcome:
+
+**XBT (not BTC):** `bc1q7ar68gl3vhpj6h6n8a3zlnqgjcm2qeatenrgm5`
+
 ## License and credit
 
 The data and everything else in this repository are licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/); full text in [LICENSE](LICENSE). You may copy, redistribute, adapt and build on it, commercially or not, as long as you give credit. Please credit "Bitcoin Node Census" and link this repository.
