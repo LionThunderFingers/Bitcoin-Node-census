@@ -267,9 +267,13 @@ PY
     # stable-list window rule), so one --self-test proves every consensus-sensitive path.
     # Requires the clone to be present.
     for _m in policy_model gen_releases gen_policy_history seed-stable; do
-        if [ -f "$TOOLS/$_m.py" ]; then
+        # seed-stable is installed on PATH on the seed host (that is how the publish step
+        # below finds it), so fall back to that when it is not next to the modules.
+        _p="$TOOLS/$_m.py"
+        [ -f "$_p" ] || [ "$_m" != seed-stable ] || _p="$(command -v seed-stable || true)"
+        if [ -n "$_p" ] && [ -f "$_p" ]; then
             echo "--- $_m ---"
-            python3 "$TOOLS/$_m.py" --self-test || rc=1
+            python3 "$_p" --self-test || rc=1
         else
             echo "self-test: $TOOLS/$_m.py not found (is the site repo cloned at $WORK?)" >&2
             rc=1
