@@ -37,6 +37,8 @@ The first published `data.json` is from 2026-09-19; `seeds.txt` starts on 2026-0
 
 **Compatibility.** Changes are additive only. Existing field names and their meanings are never changed or removed; new data arrives under new names. Ignore fields you do not recognise. Older snapshots in git history may lack fields that were added later (for example `networks`, `versions_storage`, `policy`, `next_policy`); treat a missing field as "not measured in that sample", not as zero.
 
+**Get notified of changes.** Anything that changes what the published values mean, even with no field renamed (a policy activating, a counting fix), is announced as a [GitHub Release](https://github.com/LionThunderFingers/Bitcoin-Node-census/releases). If you use this data, watch the repository with **Watch → Custom → Releases** to get those by email, or open an issue to say where you use it so you can be told directly.
+
 ## How it is measured
 
 - One crawler (LionSeed) connects to each address it learns of and completes a Bitcoin handshake, recording the services, block height, protocol version and user agent the node reports about itself.
