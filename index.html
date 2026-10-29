@@ -166,6 +166,11 @@ details.dt p+p{margin-top:9px}
 .donate button.done{background:var(--ok)}
 /* The QR holds the bare address, not a bitcoin: URI, so a scan never opens a BTC wallet
    with a payment pre-filled; the caption carries the warning the scan can't. */
+.donate-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+.donate-head .sec-head{margin-bottom:0}
+.donate-head .donate-qr{margin-bottom:-4px}
+@media (max-width:520px){ .donate-head{flex-direction:column;align-items:flex-start}
+  .donate-head .donate-qr{margin-bottom:0} }
 .donate-qr{margin:0;flex:none;text-align:center}
 .donate-qr img{display:block;width:132px;height:132px}
 .donate-qr figcaption{font-family:var(--sans);font-size:11.5px;font-weight:600;color:var(--warn);margin-top:6px}
@@ -497,16 +502,18 @@ details.dt p+p{margin-top:9px}
   </div>
 
   <section id="donateSection">
-    <div class="sec-head">
-      <h2>Support the seed & census</h2>
-      <p>The DNS seed behind this census runs on a small VPS paid out of pocket. If the data is
-         useful to you a tip toward the hosting is welcome. Thank you</p>
-    </div>
-    <div class="donate">
+    <div class="donate-head">
+      <div class="sec-head">
+        <h2>Support the seed & census</h2>
+        <p>The DNS seed behind this census runs on a small VPS paid out of pocket. If the data is
+           useful to you a tip toward the hosting is welcome. Thank you</p>
+      </div>
       <figure class="donate-qr">
         <img src="donate-qr.svg" width="132" height="132" alt="QR code of the XBT donation address">
         <figcaption>XBT only (not BTC)</figcaption>
       </figure>
+    </div>
+    <div class="donate">
       <span class="k">Donate&nbsp;XBT</span>
       <code id="donateAddr">bc1q7ar68gl3vhpj6h6n8a3zlnqgjcm2qeatenrgm5</code>
       <button type="button" id="donateCopy" class="donate-copy"
