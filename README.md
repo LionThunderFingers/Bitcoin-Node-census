@@ -1,4 +1,4 @@
-# B2B Node Census
+# Bitcoin Node Census
 
 An hourly count of the reachable post-fork (BLAKE2b, service bit 28) Bitcoin nodes, taken by crawling the network from one independent DNS seed, `seed.thelionpool.org`. Every hour the seed host writes a new sample, turns it into the JSON and text files in this repository and pushes them here. The page at https://lionthunderfingers.github.io/Bitcoin-Node-census/ reads the same files. The seeder that does the crawling is https://github.com/LionThunderFingers/LionSeed.
 
@@ -207,7 +207,7 @@ The JSON files carry only aggregates, except `stable-nodes.json`, which lists ad
 
 ## License and credit
 
-The data and everything else in this repository are licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/); full text in [LICENSE](LICENSE). You may copy, redistribute, adapt and build on it, commercially or not, as long as you give credit. Please credit "B2B Node Census" and link this repository (xbtstats.com already does).
+The data and everything else in this repository are licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/); full text in [LICENSE](LICENSE). You may copy, redistribute, adapt and build on it, commercially or not, as long as you give credit. Please credit "Bitcoin Node Census" and link this repository.
 
 ## Pipeline
 
