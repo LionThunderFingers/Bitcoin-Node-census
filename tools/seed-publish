@@ -91,6 +91,81 @@ run_py() {
     { printf '%s\n' "$COMMON_PY"; cat; } | python3 - "$@"
 }
 
+# Sanity floor on the generated sample, checked BEFORE anything is written or staged.
+# An empty, header-only or truncated crawler dump produces a structurally VALID census
+# line of all zeros, which every check further down happily accepts: it is well-formed
+# JSON, it is not empty, and it differs from the last one so it commits. The page then
+# states the reachable network has no nodes and that the next rule "activates at" the
+# height of a sample that measured nothing. This is the same shape of guard as the
+# rows >= 10 floor on seeds.txt below, applied to the live figure.
+#
+# Two absolute floors and one relative one. The relative floor compares against the
+# data.json that is published RIGHT NOW: the clone is hard-reset to origin/main before
+# the generator runs, so the file still on disk when this is called is exactly the
+# committed one. It is skipped when there is no previous file or it does not parse, so a
+# first run against a fresh repo still works.
+#
+# A refusal exits non-zero and the caller removes the candidate file, so nothing is
+# moved into place, nothing is staged and nothing is committed.
+sanity_check() {  # <generated data.json> <currently published data.json>
+    python3 - "$1" "$2" <<'PY'
+import json, sys
+
+new_path, old_path = sys.argv[1], sys.argv[2]
+MIN_REACHABLE = 10
+MIN_RECENT = 10
+MIN_SHARE_OF_PREVIOUS = 0.25
+
+
+def as_int(value):
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def load(path):
+    try:
+        with open(path) as f:
+            value = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+new = load(new_path)
+if new is None:
+    print("refusing to publish: %s is not a JSON object" % new_path, file=sys.stderr)
+    sys.exit(1)
+
+reachable = as_int(new.get("b2b_reachable"))
+recent = as_int(new.get("b2b_polled_recently"))
+problems = []
+if reachable < MIN_REACHABLE:
+    problems.append("b2b_reachable is %d, below the floor of %d"
+                    % (reachable, MIN_REACHABLE))
+if recent < MIN_RECENT:
+    problems.append("b2b_polled_recently is %d, below the floor of %d"
+                    % (recent, MIN_RECENT))
+
+# Relative floor: a real network does not lose three quarters of its reachable nodes
+# between two hourly samples, but a half-written dump reads exactly like that.
+old = load(old_path)
+if old is not None:
+    previous = as_int(old.get("b2b_reachable"))
+    if previous > 0 and reachable < previous * MIN_SHARE_OF_PREVIOUS:
+        problems.append("b2b_reachable is %d, under %d%% of the %d currently published"
+                        % (reachable, int(MIN_SHARE_OF_PREVIOUS * 100), previous))
+
+for problem in problems:
+    print("refusing to publish: %s" % problem, file=sys.stderr)
+if problems:
+    print("nothing was written or staged; the files already published are still live",
+          file=sys.stderr)
+sys.exit(1 if problems else 0)
+PY
+}
+
 # `seed-publish --self-test`: check the classifier against a fixed table and exit,
 # touching no repository and no census file. Run it after every deploy.
 if [ "${1:-}" = "--self-test" ]; then
@@ -189,6 +264,48 @@ PY
         echo "self-test: seed-census not found on PATH (set SEED_CENSUS=/path/to/seed-census)" >&2
         rc=1
     fi
+    # The publish sanity floor: every refusal path and the normal pass. sanity_check
+    # reads two files and writes nothing, so this runs entirely in a temp directory and
+    # touches no repository and no census file, like the rest of --self-test.
+    echo "--- sanity floor ---"
+    st_tmp="$(mktemp -d)" || { echo "self-test: mktemp failed" >&2; exit 1; }
+    trap 'rm -rf "$st_tmp"' EXIT
+    sf_fail=0
+    sf_case() {  # <label> <expect-pass|expect-refuse> <candidate> <published|MISSING>
+        _label="$1"; _want="$2"
+        printf '%s\n' "$3" > "$st_tmp/new.json"
+        if [ "$4" = "MISSING" ]; then
+            rm -f "$st_tmp/prev.json"
+        else
+            printf '%s\n' "$4" > "$st_tmp/prev.json"
+        fi
+        sanity_check "$st_tmp/new.json" "$st_tmp/prev.json" >/dev/null 2>&1
+        _rc=$?
+        if { [ "$_want" = "expect-pass" ] && [ "$_rc" -eq 0 ]; } ||
+           { [ "$_want" = "expect-refuse" ] && [ "$_rc" -ne 0 ]; }; then
+            echo "ok    $_label"
+        else
+            echo "FAIL  $_label (exit $_rc, wanted $_want)"
+            sf_fail=1
+        fi
+    }
+    SF_GOOD='{"b2b_reachable":1000,"b2b_polled_recently":1200}'
+    sf_case "a normal sample publishes"          expect-pass   "$SF_GOOD" "$SF_GOOD"
+    sf_case "first run, no published data.json"  expect-pass   "$SF_GOOD" MISSING
+    sf_case "published data.json does not parse" expect-pass   "$SF_GOOD" "not json at all"
+    sf_case "all zeros (empty or header-only dump)" expect-refuse \
+        '{"b2b_reachable":0,"b2b_polled_recently":0}' "$SF_GOOD"
+    sf_case "b2b_reachable under the floor of 10" expect-refuse \
+        '{"b2b_reachable":9,"b2b_polled_recently":1200}' MISSING
+    sf_case "b2b_polled_recently under the floor of 10" expect-refuse \
+        '{"b2b_reachable":1000,"b2b_polled_recently":9}' MISSING
+    sf_case "under 25% of the published count"   expect-refuse \
+        '{"b2b_reachable":249,"b2b_polled_recently":1200}' "$SF_GOOD"
+    sf_case "26% of the published count is kept" expect-pass \
+        '{"b2b_reachable":260,"b2b_polled_recently":1200}' "$SF_GOOD"
+    sf_case "the two counts are missing"         expect-refuse '{}' MISSING
+    sf_case "a JSON array, not an object"        expect-refuse '[]' MISSING
+    [ "$sf_fail" -eq 0 ] || rc=1
     exit $rc
 fi
 
@@ -220,8 +337,27 @@ from policy_model import parse_policies, current_policy
 with open(policies_path) as f:
     policies = parse_policies(f.read())
 with open(census) as f:
-    last = [l for l in f if l.strip()][-1]
-d = json.loads(last)
+    lines = [l for l in f if l.strip()]
+if not lines:
+    sys.exit("refusing to publish: %s contains no census samples" % census)
+last = lines[-1]
+# Fail CLOSED on a bad newest line. This is the live figure: silently falling back to an
+# older line would republish a stale sample as if it had just been measured, which is
+# worse than not publishing at all. history.json and the two generators deliberately do
+# the opposite and skip a bad line, because a series with a hole in it is still useful.
+#
+# The message is explicit because the cause is almost never a bug here: it is one node
+# in the crawler dump whose user agent did not survive JSON interpolation (see the
+# escaping in seed-census, which is where that is fixed).
+try:
+    d = json.loads(last)
+except ValueError as exc:
+    sys.exit("refusing to publish: the newest line of %s is not valid JSON (%s). "
+             "Nothing was published and the data.json already live is unchanged. "
+             "The offending line is: %.400s" % (census, exc, last.strip()))
+if not isinstance(d, dict):
+    sys.exit("refusing to publish: the newest line of %s is valid JSON but not an "
+             "object" % census)
 # The policy in force at the current tip (or the earliest, before any activation) drives the
 # activation window and which releases count as enforcing -- one policies.json edit moves all
 # of it, so the activation section and the enforcement split can never disagree.
@@ -261,8 +397,17 @@ if isinstance(raw_storage, dict):
 # heights_by_version keys), so the page and the split below always agree. The
 # versions_storage keys matter: that population includes pruned nodes, which are never
 # rated good and so never appear in versions -- without them a pruned node on an
-# enforcing release would be counted as not enforcing. Additive: the list can only gain
-# entries, and an entry already in it is classified identically.
+# enforcing release would be counted as not enforcing.
+#
+# WITHIN one policy epoch this list only ever gains entries: min_version is fixed, and
+# the classifier is monotonic in the release version, so a user agent that counted once
+# keeps counting. It is NOT stable ACROSS an epoch rollover. When the next policy in
+# policies.json activates, min_version moves with it and the whole list is rescored
+# against the new rule, so entries can disappear and a build that was enforcing the old
+# rule can stop counting as enforcing. history.json is rescored the same way and for the
+# same reason (see the rescoring note in README.md). The page only ever reads the list
+# that ships inside the same data.json, so it cannot be left holding one scored against
+# a rule that is no longer in force.
 # Sorted for a stable diff between runs.
 seen = set()
 for field in ("versions", "versions_storage", "heights_by_version"):
@@ -322,6 +467,10 @@ python3 -m json.tool data.json.new >/dev/null 2>&1 || {
     echo "generated data.json is not valid JSON, refusing to publish" >&2
     rm -f data.json.new; exit 1
 }
+# The floor runs here, against the candidate and the data.json still on disk from the
+# hard reset above, i.e. the one currently published. Before the mv, so a refusal leaves
+# the clone exactly as it found it.
+sanity_check data.json.new data.json || { rm -f data.json.new; exit 1; }
 mv data.json.new data.json
 
 # history.json -- the adoption curve. One point per census sample, oldest first.
