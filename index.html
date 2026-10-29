@@ -200,7 +200,7 @@ details.dt p+p{margin-top:9px}
     <div class="fig lead"><div class="v num" id="figUp"></div>
       <div class="k" id="figUpK">post-fork nodes rated good</div><div class="note" id="figUpNote">by the seeder&rsquo;s own quality gate</div></div>
     <div class="fig"><div class="v num" id="figB2"></div>
-      <div class="k">advertise the post-fork bit</div>
+      <div class="k">post-fork nodes ever seen</div>
       <div class="note" id="figB2Note"></div>
       <details class="dt"><summary>what is this?</summary>
         <div class="note" id="figB2Bias"></div>
@@ -252,7 +252,8 @@ details.dt p+p{margin-top:9px}
         <div class="notes">
           <strong>How this is measured</strong>
           <ul>
-            <li>A crawler connects to each node on port 8333 and completes a Bitcoin handshake,
+            <li>A crawler connects to each node it learns of, at the address and port that node
+                advertises, and completes a Bitcoin handshake,
                 recording the services, block height and software it reports. Nothing here is
                 second-hand.</li>
             <li>Post-fork nodes are identified by service bit 28

@@ -316,18 +316,18 @@ const pctStr = p => p === null ? DASH
 // The post-fork share of the whole crawl used to be its own tile saying the same thing as
 // this one with a percentage instead of a count. It is now the note under the count.
 function renderContextTiles(d) {
+  // The rated-good share of post-fork nodes used to be quoted here too; LionSeed only rates
+  // post-fork nodes good, so it was always 100% and said nothing.
   const shareAll = pctOf(d.b2b, d.total);
-  const shareReach = pctOf(d.b2b_reachable, d.reachable);
-  $("figB2Note").textContent = shareAll === null
-    ? "seen by the crawler"
-    : pctStr(shareAll) + " of the " + fmtOr(d.total) + " nodes crawled";
+  $("figB2Note").textContent = "including ones not heard from recently" +
+    (shareAll === null ? "" : " · " + pctStr(shareAll) + " of the " + fmtOr(d.total) + " nodes crawled");
   $("figB2Bias").textContent =
-    (shareAll === null ? "" : pctStr(shareAll) + " of every node this crawler reached " +
-      "advertises the post-fork bit. ") +
-    (shareReach === null
-      ? "The reachable-node share is not available in this sample. "
-      : pctStr(shareReach) + " of the nodes rated good are post-fork nodes. ") +
-    "The crawler bootstraps from post-fork seeds, so this is not an unbiased sample of the " +
+    "Every post-fork node the crawler has completed a handshake with and still remembers, " +
+    "however long ago. It is not a count of nodes online now; nodes that went offline or " +
+    "changed address stay in it. The headline figure is the online count. " +
+    (shareAll === null ? "" : pctStr(shareAll) + " of every node this crawler has tried " +
+      "is post-fork. ") +
+    "The crawler bootstraps from post-fork seeds, so that is not an unbiased sample of the " +
     "whole Bitcoin network. It overstates the post-fork share of it.";
 
   const fresh = pctOf(d.b2b_polled_recently, d.b2b);
@@ -335,8 +335,9 @@ function renderContextTiles(d) {
   const p90 = numOr(d.b2b_poll_age_p90, null);
   $("figFresh").textContent = pctStr(fresh);
   $("figFreshNote").textContent =
-    "“Recently” means within " + fmt(POLL_FRESH_SECONDS) + " seconds (83 minutes), " +
-    "the age at which a node decays out of the seeder's good set. Median age " +
+    "“Recently” means within " + fmt(POLL_FRESH_SECONDS) + " seconds (83 minutes). That " +
+    "window dates from the previous seeder and is kept so the series stays comparable; " +
+    "the current seeder rates a node good only if it answered within the last hour. Median age " +
     (med === null ? DASH : fmt(Math.round(Math.abs(med) < 0.5 ? 0 : med)) + "s") +
     ", 90th percentile " +
     (p90 === null ? DASH : fmt(Math.round(Math.abs(p90) < 0.5 ? 0 : p90)) + "s") + ".";

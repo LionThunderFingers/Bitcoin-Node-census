@@ -11,7 +11,8 @@ On the uptime windows: the seeder keeps exponentially-weighted reliability figur
 over 2h/8h/1d/7d/30d. They start at zero and fill as the crawler runs, so a 30-day
 figure is meaningless until the crawler has been up for roughly that long. The
 qualifying rule below therefore keys off the longest window the crawler has
-actually been running for, and tightens on its own over time.
+been running for at least three times over (so the figure has converged), and
+tightens on its own over time.
 """
 import json, os, sys, time
 
@@ -87,8 +88,9 @@ print(json.dumps({
         "threshold_pct": THRESHOLD,
         "explanation": (
             f"Reachable fork nodes with at least {THRESHOLD:.0f}% reliability over the "
-            f"{window_label} window. That window is the longest this crawler has been "
-            f"running for, so the list gets stronger the longer it runs."
+            f"{window_label} window. That is the longest window the crawler has been "
+            f"running for at least {CONVERGENCE_FACTOR} times over, so the figure has had time "
+            f"to settle; it lengthens, and the list gets stronger, the longer the crawler runs."
         ),
     },
     "qualifying_count": len(qualifying),
