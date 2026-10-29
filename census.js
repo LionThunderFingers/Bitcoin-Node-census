@@ -13,6 +13,26 @@ const numOr = (v, fb) => {
 };
 const fmtOr = v => { const n = numOr(v, null); return n === null ? DASH : fmt(n); };
 const clamp = (n, lo, hi) => n < lo ? lo : n > hi ? hi : n;
+// Round a set of percentages to whole numbers that still add up to what the set itself adds
+// up to (100, for shares of one population). Each value is floored, then the 1s that are
+// left over go to the largest fractional parts first -- the standard largest-remainder
+// method. Rounding each value independently does not preserve the total: three shares of
+// 33.3/33.3/33.4 each round down and print as 99.
+//
+// The target is the rounded sum rather than a hardcoded 100, so a caller whose values do
+// not cover the whole population gets a consistent set rather than a fabricated 100.
+// floor(v) <= v for every v, so the leftover can never be negative.
+function largestRemainder(values) {
+  const floors = values.map(v => Math.floor(v));
+  const target = Math.round(values.reduce((s, v) => s + v, 0));
+  let left = target - floors.reduce((s, v) => s + v, 0);
+  const out = floors.slice();
+  // Ties broken by original position, so the legend is stable between redraws.
+  const byFrac = values.map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i);
+  for (const o of byFrac) { if (left <= 0) break; out[o.i]++; left--; }
+  return out;
+}
 const days = b => (Math.abs(b) < 0.05 ? 0 : b * 10 / 60 / 24).toFixed(1);
 const esc = v => String(v).replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -33,7 +53,14 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const p2 = n => String(n).padStart(2, "0");
 // Everything on this page is stated in UTC, including the stamp in the masthead.
-const dayLabel = d => d.getUTCDate() + " " + MONTHS[d.getUTCMonth()];
+// The year is included whenever the date is NOT in the viewer's current year. The census
+// series is years long and these labels date a release's first sighting and its peak, so a
+// bare "19 Sep" was ambiguous the moment the data crossed a new year -- and read as this
+// year, which is the wrong way round for a first-seen date.
+const dayLabelFull = d => d.getUTCDate() + " " + MONTHS[d.getUTCMonth()] + " " + d.getUTCFullYear();
+const dayLabel = d => d.getUTCFullYear() === new Date().getUTCFullYear()
+  ? d.getUTCDate() + " " + MONTHS[d.getUTCMonth()]
+  : dayLabelFull(d);
 const timeLabel = d => p2(d.getUTCHours()) + ":" + p2(d.getUTCMinutes());
 const utcLabel = ts => { const d = new Date(ts * 1000);
   return dayLabel(d) + " " + timeLabel(d) + " UTC"; };
@@ -117,6 +144,11 @@ function render(d) {
   renderHeights(d);
   renderNetworks(d);
   renderContextTiles(d);
+  // The policy chart may already have drawn from policy-history.json before this fetch
+  // landed. It needs a redraw because its legend falls back to the policy names in THIS
+  // file when policies.json did not load (see pcLabel), and without the redraw that
+  // fallback would only ever apply on the slower of the two orderings.
+  if (POLICY_SERIES) drawPolicyChart();
 }
 
 // ---- which population a figure is counted over ----
@@ -239,12 +271,23 @@ function renderNetworks(d) {
   if (!sec) return;
   const net = (d.networks && typeof d.networks === "object" && !Array.isArray(d.networks))
     ? d.networks : null;
+  const KNOWN = ["tor", "i2p", "ipv4", "ipv6"];
   const rows = net ? [
     ["Tor (v3 onion)", "tor"],
     ["I2P", "i2p"],
     ["IPv4 (clearnet)", "ipv4"],
     ["IPv6 (clearnet)", "ipv6"]
   ].map(([label, k]) => [label, numOr(net[k], 0)]) : [];
+  // Anything the publisher reports under a key this page does not know about -- a network
+  // type added to the seeder after this page was written -- used to be dropped silently
+  // while the caption still claimed the total was every rated-good node. The bars then did
+  // not add up to the number printed under them. Collect the rest into one bar instead, so
+  // the caption's total is always the sum of what is shown.
+  if (net) {
+    let other = 0;
+    for (const [k, v] of Object.entries(net)) if (!KNOWN.includes(k)) other += Math.max(0, numOr(v, 0));
+    if (other > 0) rows.push(["Other address types", other]);
+  }
   const total = rows.reduce((s, r) => s + r[1], 0);
   // No field, or a field that sums to zero (nothing reachable yet): nothing to show.
   if (!net || total <= 0) { sec.hidden = true; return; }
@@ -571,9 +614,14 @@ function renderSoftware() {
     return fmt(c) + (when === DASH ? "" : " · " + when);
   };
 
+  // A node that reported no user agent at all keys the release maps under "", which
+  // rendered as an empty cell: a row with counts beside it and nothing saying what it was.
+  // Name it instead. The raw "" key is still what every lookup uses, so enforcing
+  // membership, releases.json matching and the sums are untouched.
+  const uaLabel = ua => ua === "" ? "(no user agent)" : ua;
   const nameCell = ua => {
     const tag = releaseTag(ua);
-    return el("td", { class: "ua" }, ua,
+    return el("td", { class: "ua" }, uaLabel(ua),
       tag ? el("span", { class: "tag" }, " — " + tag) : null);
   };
   const enfCell = ua => enfSet ? (enfSet.has(ua) ? "yes" : "no") : DASH;
@@ -677,6 +725,30 @@ function renderStable(s) {
     const y = clamp(x, 0, 100);
     return (y === 0 ? 0 : y).toFixed(1) + "%";
   };
+  // Which uptime columns to show. The table used to be a fixed 2h/1d/7d, but the window
+  // the qualifying rule is actually decided on widens as the crawler ages, so on an 8h or
+  // a 30d criterion the page listed three columns and the one the "qualifies" flag came
+  // from was not among them: every number shown was then beside the point.
+  //
+  // The three defaults stay (they are the short/medium/long read most people want) and the
+  // deciding window is added when it is not already one of them, in length order so the
+  // columns still run shortest to longest. It is marked, so the reader can see which
+  // column the bar was applied to.
+  const win = (typeof crit.window === "string" && crit.window.trim()) ? crit.window.trim() : null;
+  const cols = ["2h", "1d", "7d"];
+  if (win && !cols.includes(win)) {
+    // Sort by the label's own length in seconds. An unrecognised label sorts last rather
+    // than being dropped: it is the deciding column, so it has to appear.
+    const secs = lbl => { const m = /^(\d+)([hd])$/.exec(lbl);
+      return m ? Number(m[1]) * (m[2] === "h" ? 3600 : 86400) : Infinity; };
+    cols.push(win);
+    cols.sort((a, b) => secs(a) - secs(b));
+  }
+  $("stableHead").replaceChildren(
+    el("th", { scope: "col" }, "Address"),
+    ...cols.map(c => el("th", { scope: "col", style: "text-align:right" }, c,
+      c === win ? el("span", { class: "tag" }, " rule") : null)));
+
   const rows = Array.isArray(s.nodes) ? s.nodes.slice(0, 25) : [];
   $("stableRows").replaceChildren(...(rows.length
     ? rows.map(n => {
@@ -684,11 +756,9 @@ function renderStable(s) {
         return el("tr", null,
           el("td", { style: "font-family:var(--sans);font-size:12.5px;word-break:break-all" },
             String((n && n.address) != null ? n.address : DASH)),
-          el("td", { class: "n" }, pctCell(u["2h"])),
-          el("td", { class: "n" }, pctCell(u["1d"])),
-          el("td", { class: "n" }, pctCell(u["7d"])));
+          ...cols.map(c => el("td", { class: "n" }, pctCell(u[c]))));
       })
-    : [el("tr", null, el("td", { colspan: "4", style: "color:var(--text-3)" },
+    : [el("tr", null, el("td", { colspan: String(cols.length + 1), style: "color:var(--text-3)" },
         "No node clears the bar yet. The crawler needs more observation time before any " +
         "longer-window figure is trustworthy."))]));
 }
@@ -723,7 +793,23 @@ function policyReleaseTs(id) {
 const PC_PALETTE = ["var(--beacon)", "var(--signal)", "var(--warn)", "var(--crit)", "var(--ok)"];
 
 function pcColor(id, i, preFirst) { return id === "pre" ? "var(--text-3)" : PC_PALETTE[(i - (preFirst ? 1 : 0) + PC_PALETTE.length) % PC_PALETTE.length]; }
-function pcLabel(id) { return (POLICY_SERIES.labels && POLICY_SERIES.labels[id]) || (id === "pre" ? "Pre-fork / older" : id); }
+// Legend label for a bucket id. policies.json is the source, but it is an independent fetch
+// that can 404 or fail on its own, and the legend then read "maturity45" -- an internal id
+// the page never explains anywhere. data.json names the current and the next epoch itself
+// (policy.short / next_policy.short), which between them cover the ids the chart is
+// actually about, so fall back to those before showing a raw id.
+function pcLabel(id) {
+  const fromFile = POLICY_SERIES && POLICY_SERIES.labels && POLICY_SERIES.labels[id];
+  if (fromFile) return String(fromFile);
+  if (id === "pre") return "Pre-fork / older";
+  for (const p of [obj(DATA && DATA.policy), obj(DATA && DATA.next_policy)]) {
+    if (p && p.id === id) {
+      const name = String(p.short || p.name || "").trim();
+      if (name) return name;
+    }
+  }
+  return id;
+}
 
 function renderPolicyHistory(h, labels) {
   const sec = $("policyChartSection");
@@ -776,6 +862,12 @@ function drawPolicyChart() {
       '" y2="' + n1(Y(v)) + '"/><text class="ch-axis" x="' + (padL - 7) + '" y="' + n1(Y(v) + 3.5) +
       '" text-anchor="end">' + v + "%</text>";
   }
+  // Once the series itself crosses a year boundary, EVERY tick carries its year, including
+  // the ones in the viewer's current year: on an axis the labels are read against each
+  // other, and "19 Sep ... 4 Jan" with the year on only one end is harder to read than
+  // either having it or neither.
+  const spansYear = new Date(t0 * 1000).getUTCFullYear() !== new Date(t1 * 1000).getUTCFullYear();
+  const tickLabel = d => spansYear ? dayLabelFull(d) : dayLabel(d);
   const nTicks = W < 420 ? 3 : W < 640 ? 4 : 6; const seen = new Set(); let xax = "";
   for (let k = 0; k < nTicks; k++) {
     const i = Math.round(k * (pts.length - 1) / (nTicks - 1));
@@ -783,7 +875,7 @@ function drawPolicyChart() {
     const p = pts[i], d = new Date(p.ts * 1000);
     const anchor = i === 0 ? "start" : i === pts.length - 1 ? "end" : "middle";
     xax += '<text class="ch-axis" x="' + n1(X(p.ts)) + '" y="' + (padT + ph + 15) +
-      '" text-anchor="' + anchor + '">' + esc(dayLabel(d)) + "</text>";
+      '" text-anchor="' + anchor + '">' + esc(tickLabel(d)) + "</text>";
   }
   let lines = "", markers = "", legend = [];
   ids.forEach((id, i) => {
@@ -813,10 +905,15 @@ function drawPolicyChart() {
     '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' +
     esc(aria) + '">' + grid + xax + markers + lines + "</svg>");
 
-  $("pcLegend").replaceChildren(...legend.map(it => el("span", { class: "pc-leg" },
+  // Rounded with largest remainder, not one by one. Every node is in exactly one bucket, so
+  // the shares really do sum to 100 and the caption and the aria label both say so -- but
+  // rounding each share on its own turned 33.3/33.3/33.4 into 33/33/33, and the legend then
+  // printed 99% next to a sentence promising 100.
+  const legendPct = largestRemainder(legend.map(it => it.pct));
+  $("pcLegend").replaceChildren(...legend.map((it, i) => el("span", { class: "pc-leg" },
     el("span", { class: "pc-sw", style: "background:" + it.col }),
     el("span", null, pcLabel(it.id) + " "),
-    el("span", { class: "pv" }, Math.round(it.pct) + "%"))));
+    el("span", { class: "pv" }, legendPct[i] + "%"))));
   const last = pts[pts.length - 1];
   $("pcCap").textContent = fmt(pts.length) + " samples, " + utcLabel(pts[0].ts) + " to " +
     utcLabel(last.ts) + ". Each node counted once, in the newest policy its software " +

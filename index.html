@@ -479,7 +479,12 @@ details.dt p+p{margin-top:9px}
 
       <div class="scroll" style="margin-top:18px">
         <table>
-          <thead><tr>
+          <!-- The uptime columns are rebuilt by census.js from stable-nodes.json, because
+               the window the qualifying rule is decided on widens as the crawler ages
+               (2h -> 8h -> 1d -> 7d -> 30d) and a fixed set of columns can leave the
+               deciding one off the table entirely. These three are the no-JS fallback and
+               the shortest set that is always shown. -->
+          <thead><tr id="stableHead">
             <th scope="col">Address</th>
             <th scope="col" style="text-align:right">2h</th>
             <th scope="col" style="text-align:right">1d</th>
