@@ -38,6 +38,30 @@ function nettype(a) {
     if (a ~ /^\[/)      return "ipv6"
     return "ipv4"
 }
+# Ascending insertion sort over a[0 .. n-1]; mawk has no asort(). Arrays pass by
+# reference, so this sorts in place. n is a node count (order 1-2k), the same size
+# the poll-age sort in END has always handled inline.
+function isort(a, n,   i, j, key) {
+    for (i = 1; i < n; i++) {
+        key = a[i]
+        j = i - 1
+        while (j >= 0 && a[j] > key) {
+            a[j + 1] = a[j]
+            j--
+        }
+        a[j + 1] = key
+    }
+}
+# ctrl: a character class of the bytes that must never reach a JSON string literal,
+# i.e. 0x01-0x1f and 0x7f. Built with sprintf rather than written as \x escapes
+# because mawk does not support \x, and NUL is skipped because no awk string can
+# hold one. Compiled once here and used as a dynamic regex in the user-agent
+# cleanup below.
+BEGIN {
+    ctrl = "["
+    for (ci = 1; ci < 32; ci++) ctrl = ctrl sprintf("%c", ci)
+    ctrl = ctrl sprintf("%c", 127) "]"
+}
 NR > 1 {
     total++
     if ($2 == 1) reachable++
@@ -49,7 +73,28 @@ NR > 1 {
         # $2 == 1 branch could never be attributed a pruned node.
         ua = ""
         for (i = 12; i <= NF; i++) ua = ua (i > 12 ? " " : "") $i
+        # Make the user agent safe to interpolate into a JSON string ONCE, here where
+        # it is built: every emission site below (versions, heights_by_version,
+        # versions_storage) reads this one variable, so there is no second copy that
+        # could fall out of sync.
+        #
+        # The LionSeed dump strips " and control characters but NOT backslashes, so a
+        # user agent containing \ produced an unparseable census line -- and because
+        # seed-publish reads only the NEWEST line, publishing stopped completely for
+        # as long as that node stayed in the dump. Backslash is doubled by splitting
+        # and rejoining rather than with gsub: a backslash in a gsub REPLACEMENT is
+        # itself reprocessed, and how many are needed to emit two differs between
+        # awks, while plain concatenation is literal in every awk.
+        if (index(ua, "\\") > 0) {
+            nbs = split(ua, bsp, /\\/)
+            ua = bsp[1]
+            for (bsi = 2; bsi <= nbs; bsi++) ua = ua "\\\\" bsp[bsi]
+        }
         gsub(/"/, "", ua)
+        # Defence in depth: the crawler already strips control characters, and field
+        # splitting turns a tab or a newline into a separator long before this point,
+        # but a raw 0x01 or 0x7f in the dump would still break the JSON. Drop them.
+        gsub(ctrl, "", ua)
         # Poll recency for ALL known fork nodes, not just currently-good ones:
         # a node that decayed out of "good" is exactly what we want to measure.
         # 4980s = 83min is the point at which stat2H.count (tau=2h) falls below
@@ -91,7 +136,10 @@ NR > 1 {
             # below, so net[] sums to b2b_reachable by construction.
             net[nettype($1)]++
             ver[ua]++
-            if ($9 + 0 > maxh) maxh = $9 + 0
+            # max_height is NOT taken here any more: it is derived from h[] in END,
+            # where the whole set of heights is known and an outlier can be capped.
+            # See the robust-tip block there.
+            #
             # hua[] is indexed by the SAME counter as h[], so height and
             # user-agent stay aligned by construction rather than by a second
             # counter that could drift. It is written AFTER the increment,
@@ -112,8 +160,41 @@ END {
     # maxh reference over the identical population (reachable fork nodes only),
     # so INVARIANT: for each bucket, the sum of heights_by_version[*][bucket]
     # over all user agents equals the aggregate h_<bucket> for that sample.
+    #
+    # The tip itself, from peer-reported heights. max_height USED to be the single
+    # highest height any rated-good node claimed, with no upper bound: LionSeed only
+    # rejects heights BELOW the fork, so one node claiming an absurd height became the
+    # tip, pushed every honest node into "behind", and -- because seed-publish selects
+    # the in-force policy from max_height -- flipped the published policy epoch,
+    # killing the activation countdown downstream.
+    #
+    # Robust tip instead: take the median of the rated-good heights, discard every
+    # height more than 1008 blocks (about a week) above it, and use the highest that
+    # remains. A median cannot be moved by a minority of liars, and 1008 blocks is far
+    # wider than any honest crawl spread while being far narrower than a fabricated tip.
+    #
+    # ACCEPTED TRADE, owner-approved: a genuine tip more than 1008 blocks above the
+    # median of the reachable set would be capped too, and max_height would then lag
+    # the real chain until the median caught up.
+    #
+    # Nodes above the cap are NOT dropped -- they are counted in "tip" with their
+    # distance clamped to 0 -- so every published sum invariant still holds exactly:
+    # the four height buckets sum to b2b_reachable, and heights_by_version sums to
+    # them bucket by bucket, which is what the self-test checks.
+    for (i = 0; i < n_h; i++) hs[i] = h[i]
+    isort(hs, n_h)
+    maxh = 0
+    if (n_h > 0) {
+        if (n_h % 2 == 1) h_med = hs[int((n_h - 1) / 2)]
+        else h_med = int((hs[int(n_h / 2) - 1] + hs[int(n_h / 2)]) / 2)
+        h_cap = h_med + 1008
+        for (i = 0; i < n_h; i++) if (hs[i] <= h_cap && hs[i] > maxh) maxh = hs[i]
+    }
     for (i = 0; i < n_h; i++) {
         d = maxh - h[i]
+        # A node claiming more than the capped tip sits at distance 0, not a negative
+        # one, so it lands in "tip" and the buckets keep summing to b2b_reachable.
+        if (d < 0) d = 0
         u = hua[i]
         if (d == 0) { tip++; hv_tip[u]++ }
         else if (d <= 6) { near++; hv_near[u]++ }
@@ -271,7 +352,115 @@ check("sum(heights_by_version.tip)",
 print("\n%s" % ("ALL PASS" if not failed else "%d FAILED" % failed))
 sys.exit(1 if failed else 0)
 PY
-    exit $?
+    rc=$?
+
+    # ---- user agents that are not safe to interpolate into JSON ----
+    # The dump rows are written by python rather than a heredoc so the control bytes are
+    # unambiguous in this source file: \x01 and \x7f are the two the crawler can still
+    # pass through (a tab or a newline is consumed by awk field splitting first, and the
+    # tab row below checks exactly that). Same 12-column layout as the fixture above.
+    echo "--- user-agent escaping ---"
+    python3 - "$tmp/dump_ua" <<'PY'
+import sys
+ROWS = [
+    "/Satoshi:29.4.2/Knots:20260508/t\\",        # trailing backslash: used to break JSON
+    "/Satoshi:29.4.2/Knots:20260508/a\\b/",      # backslash mid-string
+    "/Satoshi:29.4.2/Knots:\x0120260508\x7f/",   # control characters
+    "/Satoshi:29.4.2/Knots:20260508/\tx/",       # tab: becomes the field-join space
+]
+with open(sys.argv[1], "w", encoding="utf-8", newline="\n") as f:
+    f.write("# address good lastSuccess p2h p8h p1d p7d p30d blocks svcs version\n")
+    for i, ua in enumerate(ROWS, start=1):
+        f.write("2.0.0.%d:8333 1 1999999000 100.00%% 100.00%% 100.00%% 100.00%% 100.00%% "
+                "100 10000c09 70016 \"%s\"\n" % (i, ua))
+PY
+    run_census 2000000000 1999999999 "$tmp/dump_ua" > "$tmp/line_ua" || {
+        echo "self-test: awk run failed on the user-agent fixture" >&2; rc=1; }
+    python3 - "$tmp/line_ua" <<'PY' || rc=1
+import json, sys
+
+# THE point of this fixture: the line must still be parseable JSON. Before the escaping
+# fix this raised and seed-publish, which reads only the newest line, refused forever.
+with open(sys.argv[1], encoding="utf-8") as f:
+    d = json.loads(f.read().strip())
+
+WANT = {
+    "/Satoshi:29.4.2/Knots:20260508/t\\": 1,      # backslash round-trips
+    "/Satoshi:29.4.2/Knots:20260508/a\\b/": 1,
+    "/Satoshi:29.4.2/Knots:20260508/": 1,         # control characters dropped
+    "/Satoshi:29.4.2/Knots:20260508/ x/": 1,      # tab collapsed to the join space
+}
+failed = 0
+
+
+def check(label, got, want):
+    global failed
+    ok = got == want
+    failed += not ok
+    print("%s  %-42s got %r want %r" % ("ok  " if ok else "FAIL", label, got, want))
+
+
+check("versions round-trip", d["versions"], WANT)
+check("versions_storage keys", sorted(d["versions_storage"]), sorted(WANT))
+check("heights_by_version keys", sorted(d["heights_by_version"]), sorted(WANT))
+check("b2b_reachable", d["b2b_reachable"], 4)
+check("sum(versions) == b2b_reachable", sum(d["versions"].values()), d["b2b_reachable"])
+print("\n%s" % ("ALL PASS" if not failed else "%d FAILED" % failed))
+sys.exit(1 if failed else 0)
+PY
+
+    # ---- a rated-good node lying about the tip ----
+    # Six honest nodes around height 1000000 and one claiming 99999999. The median is
+    # 1000000, so the cap is 1001008 and the liar is excluded from the tip -- but still
+    # counted, in "tip", so the bucket sums stay exact.
+    echo "--- robust tip ---"
+    cat > "$tmp/dump_tip" <<'FIXTURE'
+# address  good  lastSuccess  %(2h)  %(8h)  %(1d)  %(7d)  %(30d)  blocks  svcs  version
+3.0.0.1:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%  1000000  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+3.0.0.2:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%  1000000  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+3.0.0.3:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%  1000000  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+3.0.0.4:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%  1000000  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+3.0.0.5:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%  1000000  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+3.0.0.6:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%   999998  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+3.0.0.7:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00% 99999999  10000c09  70016 "/Liar:1.0/"
+FIXTURE
+    run_census 2000000000 1999999999 "$tmp/dump_tip" > "$tmp/line_tip" || {
+        echo "self-test: awk run failed on the robust-tip fixture" >&2; rc=1; }
+    python3 - "$tmp/line_tip" <<'PY' || rc=1
+import json, sys
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    d = json.loads(f.read().strip())
+
+failed = 0
+
+
+def check(label, got, want):
+    global failed
+    ok = got == want
+    failed += not ok
+    print("%s  %-42s got %r want %r" % ("ok  " if ok else "FAIL", label, got, want))
+
+
+check("max_height is the honest tip", d["max_height"], 1000000)
+check("b2b_reachable", d["b2b_reachable"], 7)
+# The liar is counted at distance 0, so tip is the five honest tip nodes plus it.
+check("h_tip (5 honest + the liar)", d["h_tip"], 6)
+check("h_near (the node 2 blocks back)", d["h_near"], 1)
+check("h_day", d["h_day"], 0)
+check("h_behind (nobody is pushed back)", d["h_behind"], 0)
+check("buckets sum to b2b_reachable",
+      d["h_tip"] + d["h_near"] + d["h_day"] + d["h_behind"], d["b2b_reachable"])
+for bucket in ("tip", "near", "day", "behind"):
+    check("sum(heights_by_version.%s)" % bucket,
+          sum(b[bucket] for b in d["heights_by_version"].values()), d["h_" + bucket])
+check("the liar's own bucket", d["heights_by_version"]["/Liar:1.0/"],
+      {"tip": 1, "near": 0, "day": 0, "behind": 0})
+print("\n%s" % ("ALL PASS" if not failed else "%d FAILED" % failed))
+sys.exit(1 if failed else 0)
+PY
+
+    exit $rc
 fi
 
 [ -f "$DUMP" ] || { echo "no dump at $DUMP" >&2; exit 1; }
