@@ -164,6 +164,11 @@ details.dt p+p{margin-top:9px}
                border:0;padding:9px 15px;cursor:pointer;flex:none}
 .donate button:hover{opacity:.9}
 .donate button.done{background:var(--ok)}
+/* The QR holds the bare address, not a bitcoin: URI, so a scan never opens a BTC wallet
+   with a payment pre-filled; the caption carries the warning the scan can't. */
+.donate-qr{margin:0;flex:none;text-align:center}
+.donate-qr img{display:block;width:132px;height:132px}
+.donate-qr figcaption{font-family:var(--sans);font-size:11.5px;font-weight:600;color:var(--warn);margin-top:6px}
 /* Slim always-visible strip under the figures; the full section stays at the bottom. */
 .donate-strip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:14px 0 0;
               padding:8px 12px;border-left:3px solid var(--warn);background:var(--warn-bg);
@@ -498,6 +503,10 @@ details.dt p+p{margin-top:9px}
          useful to you a tip toward the hosting is welcome. Thank you</p>
     </div>
     <div class="donate">
+      <figure class="donate-qr">
+        <img src="donate-qr.svg" width="132" height="132" alt="QR code of the XBT donation address">
+        <figcaption>XBT only (not BTC)</figcaption>
+      </figure>
       <span class="k">Donate&nbsp;XBT</span>
       <code id="donateAddr">bc1q7ar68gl3vhpj6h6n8a3zlnqgjcm2qeatenrgm5</code>
       <button type="button" id="donateCopy" class="donate-copy"
