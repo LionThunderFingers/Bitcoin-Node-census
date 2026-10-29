@@ -20,11 +20,11 @@ set -uo pipefail
 DUMP="${DUMP:-/var/lib/dnsseed/dnsseed.dump}"
 OUT="${OUT:-/var/lib/dnsseed/census.jsonl}"
 
-[ -f "$DUMP" ] || { echo "no dump at $DUMP" >&2; exit 1; }
-
-# mawk has no strtonum()/and(), so service bit 28 is tested by position: svcs is
-# always 8 hex digits, so bit 28 is the low bit of the first character.
-awk -v ts="$(date +%s)" -v dumpts="$(stat -c %Y "$DUMP")" '
+# The awk program lives in a variable rather than inline so `--self-test` below can run
+# the EXACT same code over a fixture dump. mawk has no strtonum()/and(), so service bits
+# are tested by hex-digit position throughout (see the comments in place); keep it that
+# way -- the seed host runs mawk, not gawk. The program must stay free of single quotes.
+AWK_PROG='
 function isb2b(s,   n) {
     n = substr(s, 1, 1)
     return (n=="1"||n=="3"||n=="5"||n=="7"||n=="9"||n=="b"||n=="d"||n=="f"||n=="B"||n=="D"||n=="F")
@@ -43,6 +43,13 @@ NR > 1 {
     if ($2 == 1) reachable++
     if (isb2b($10)) {
         b2b++
+        # User agent of this row. Read here, ABOVE both populations, because the
+        # recently-polled storage split needs it as much as the reachable version
+        # counts do: a pruned node is never rated good, so a UA read only inside the
+        # $2 == 1 branch could never be attributed a pruned node.
+        ua = ""
+        for (i = 12; i <= NF; i++) ua = ua (i > 12 ? " " : "") $i
+        gsub(/"/, "", ua)
         # Poll recency for ALL known fork nodes, not just currently-good ones:
         # a node that decayed out of "good" is exactly what we want to measure.
         # 4980s = 83min is the point at which stat2H.count (tau=2h) falls below
@@ -66,9 +73,16 @@ NR > 1 {
                 # digit: serves full history (archival). NODE_NETWORK_LIMITED (bit 10)
                 # is the 0x4 bit of the 6th digit: advertised WITHOUT NODE_NETWORK means
                 # pruned. Neither is "other".
-                if (substr($10, 8, 1) ~ /[13579bdfBDF]/) archival++
-                else if (substr($10, 6, 1) ~ /[4567cdefCDEF]/) pruned++
-                else storother++
+                #
+                # The per-UA counters are incremented in the SAME branches as the
+                # aggregates, over the identical population, so INVARIANT: summed over
+                # every user agent, versions_storage equals storage_archival /
+                # storage_pruned / storage_other, and their total equals
+                # b2b_polled_recently. seed-census --self-test checks exactly that.
+                if (substr($10, 8, 1) ~ /[13579bdfBDF]/) { archival++; vs_arch[ua]++ }
+                else if (substr($10, 6, 1) ~ /[4567cdefCDEF]/) { pruned++; vs_pruned[ua]++ }
+                else { storother++; vs_other[ua]++ }
+                vs_seen[ua] = 1
             }
         }
         if ($2 == 1) {
@@ -76,9 +90,6 @@ NR > 1 {
             # Reachable fork node by network. Same population as b2b_up and ver[]
             # below, so net[] sums to b2b_reachable by construction.
             net[nettype($1)]++
-            ua = ""
-            for (i = 12; i <= NF; i++) ua = ua (i > 12 ? " " : "") $i
-            gsub(/"/, "", ua)
             ver[ua]++
             if ($9 + 0 > maxh) maxh = $9 + 0
             # hua[] is indexed by the SAME counter as h[], so height and
@@ -156,7 +167,115 @@ END {
         printf "\"%s\":{\"tip\":%d,\"near\":%d,\"day\":%d,\"behind\":%d}", vk, hv_tip[vk]+0, hv_near[vk]+0, hv_day[vk]+0, hv_behind[vk]+0
         hbv_first = 0
     }
+    # versions_storage: the archival/pruned/other split PER USER AGENT, over the same
+    # recently-polled population as storage_*. Additive, emitted last, so every existing
+    # reader is untouched. Iterating vs_seen[] (not the three bucket arrays) gives one
+    # entry per user agent with explicit zeros, and keeps the sum invariant above exact.
+    # Its population is deliberately NOT the one "versions" uses: versions is the rated-good
+    # set (archival only), this is every fork node polled inside the freshness window.
+    printf "},\"versions_storage\":{"
+    vsq_first = 1
+    for (vq in vs_seen) {
+        if (!vsq_first) printf ","
+        printf "\"%s\":{\"archival\":%d,\"pruned\":%d,\"other\":%d}", vq, vs_arch[vq]+0, vs_pruned[vq]+0, vs_other[vq]+0
+        vsq_first = 0
+    }
     printf "}}\n"
-}' "$DUMP" >> "$OUT"
+}'
+
+# One census line on stdout. ts/dumpts are arguments rather than read in here so the
+# self-test can pin them and get a byte-identical line out of a fixture.
+run_census() {  # <ts> <dump_ts> <dump-file>
+    awk -v ts="$1" -v dumpts="$2" "$AWK_PROG" "$3"
+}
+
+# `seed-census --self-test`: run the awk program over a fixture dump covering every
+# classification branch and check the invariants it claims. Touches no seeder file and
+# no output file. Needs python3 (same host as seed-publish, which already requires it)
+# only to read the JSON back; the production path stays bash + awk + coreutils.
+if [ "${1:-}" = "--self-test" ]; then
+    tmp="$(mktemp -d)" || { echo "self-test: mktemp failed" >&2; exit 1; }
+    trap 'rm -rf "$tmp"' EXIT
+    # Columns, as the seeder writes them: address good lastSuccess %2h %8h %1d %7d %30d
+    # blocks svcs version "user agent". Row 1 is the header and is skipped by NR > 1.
+    #
+    # svcs digits that matter: first digit odd = BLAKE2b service bit 28; last digit odd =
+    # NODE_NETWORK (archival); 6th digit in 4-7/c-f = NODE_NETWORK_LIMITED (pruned when
+    # NODE_NETWORK is absent). ts is pinned to 2000000000, so lastSuccess 1999999000 is
+    # 1000s old (inside the 4980s window) and 1999990000 is 10000s old (outside it).
+    cat > "$tmp/dump" <<'FIXTURE'
+# address  good  lastSuccess  %(2h)  %(8h)  %(1d)  %(7d)  %(30d)  blocks  svcs  version
+1.0.0.1:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%  100  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+1.0.0.2:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%  100  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+1.0.0.3:8333      0   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%   99  10000c08  70016 "/Satoshi:29.4.2/Knots:20260508/"
+1.0.0.4:8333      0   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%   99  10000c08  70016 "/Satoshi:29.4.3/Knots:20260508/"
+1.0.0.5:8333      0   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%   99  10000008  70016 "/Satoshi:29.4.3/Knots:20260508/"
+1.0.0.6:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%   94  10000c09  70016 "/Satoshi:29.4.1/Knots:20260508/ Plumb:7"
+1.0.0.7:8333      0   1999990000  100.00% 100.00% 100.00% 100.00% 100.00%   99  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+1.0.0.8:8333      0            0  100.00% 100.00% 100.00% 100.00% 100.00%   99  10000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+1.0.0.9:8333      1   1999999000  100.00% 100.00% 100.00% 100.00% 100.00%  100  00000c09  70016 "/Satoshi:29.4.2/Knots:20260508/"
+FIXTURE
+    run_census 2000000000 1999999999 "$tmp/dump" > "$tmp/line" || {
+        echo "self-test: awk run failed" >&2; exit 1; }
+    python3 - "$tmp/line" <<'PY'
+import json, sys
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    d = json.loads(f.read().strip())
+
+A = "/Satoshi:29.4.2/Knots:20260508/"
+B = "/Satoshi:29.4.3/Knots:20260508/"
+C = "/Satoshi:29.4.1/Knots:20260508/ Plumb:7"
+vs = d["versions_storage"]
+failed = 0
+
+
+def check(label, got, want):
+    global failed
+    ok = got == want
+    failed += not ok
+    print("%s  %-42s got %r want %r" % ("ok  " if ok else "FAIL", label, got, want))
+
+
+# The non-fork row (svcs 00000c09) is excluded everywhere; the stale and never-succeeded
+# rows are excluded from the recently-polled population only.
+check("b2b (fork rows)", d["b2b"], 8)
+check("b2b_reachable (good fork rows)", d["b2b_reachable"], 3)
+check("b2b_polled_recently", d["b2b_polled_recently"], 6)
+check("storage_archival", d["storage_archival"], 3)
+check("storage_pruned", d["storage_pruned"], 2)
+check("storage_other", d["storage_other"], 1)
+
+# THE invariant: versions_storage summed over every user agent is storage_*, and its
+# grand total is b2b_polled_recently.
+for field, key in (("storage_archival", "archival"), ("storage_pruned", "pruned"),
+                   ("storage_other", "other")):
+    check("sum(versions_storage.%s)" % key,
+          sum(v[key] for v in vs.values()), d[field])
+check("sum(versions_storage) == polled_recently",
+      sum(sum(v.values()) for v in vs.values()), d["b2b_polled_recently"])
+# versions is a DIFFERENT population (rated good only) and keeps its own invariant.
+check("sum(versions) == b2b_reachable", sum(d["versions"].values()), d["b2b_reachable"])
+
+# Per-UA attribution, including a pruned node whose user agent only ever appears on a
+# non-good row -- the case a UA read inside the good-only branch would have lost.
+check("vs[A]", vs[A], {"archival": 2, "pruned": 1, "other": 0})
+check("vs[B]", vs[B], {"archival": 0, "pruned": 1, "other": 1})
+check("vs[C] (multi-word UA)", vs[C], {"archival": 1, "pruned": 0, "other": 0})
+check("versions has no pruned-only UA", B in d["versions"], False)
+check("versions_storage UA count", len(vs), 3)
+# heights_by_version keeps its own invariant over the reachable set.
+check("sum(heights_by_version.tip)",
+      sum(b["tip"] for b in d["heights_by_version"].values()), d["h_tip"])
+
+print("\n%s" % ("ALL PASS" if not failed else "%d FAILED" % failed))
+sys.exit(1 if failed else 0)
+PY
+    exit $?
+fi
+
+[ -f "$DUMP" ] || { echo "no dump at $DUMP" >&2; exit 1; }
+
+run_census "$(date +%s)" "$(stat -c %Y "$DUMP")" "$DUMP" >> "$OUT"
 
 tail -1 "$OUT"
