@@ -1,6 +1,6 @@
 # Bitcoin Node Census
 
-An hourly count of the reachable Blake2b (service bit 28) Bitcoin nodes, taken by crawling the network from one independent DNS seed, `seed.thelionpool.org`. Every hour the seed host writes a new sample, turns it into the JSON and text files in this repository and pushes them here. The page at https://lionthunderfingers.github.io/Bitcoin-Node-census/ reads the same files. The seeder that does the crawling is https://github.com/LionThunderFingers/LionSeed.
+An hourly count of the reachable BLAKE2b (service bit 28) Bitcoin nodes, taken by crawling the network from one independent DNS seed, `seed.thelionpool.org`. Every hour the seed host writes a new sample, turns it into the JSON and text files in this repository and pushes them here. The page at https://lionthunderfingers.github.io/Bitcoin-Node-census/ reads the same files. The seeder that does the crawling is https://github.com/LionThunderFingers/LionSeed.
 
 ## Using the data
 
@@ -43,23 +43,23 @@ The first published `data.json` is from 2026-09-19; `seeds.txt` starts on 2026-0
 
 - One crawler (LionSeed) connects to each address it learns of and completes a Bitcoin handshake, recording the services, block height, protocol version and user agent the node reports about itself.
 - Only nodes that accept incoming connections can be seen. Nodes behind NAT that never listen are invisible, so every count is a lower bound.
-- A node is Blake2b if it advertises service bit 28 (`0x10000000`, `NODE_BLAKE2B`). That bit is taken only from the node's own handshake, never from addresses gossiped by other peers.
+- A node is BLAKE2b if it advertises service bit 28 (`0x10000000`, `NODE_BLAKE2B`). That bit is taken only from the node's own handshake, never from addresses gossiped by other peers.
 - Clearnet (IPv4, IPv6), Tor and I2P are crawled. Tor and I2P since 27 Sep 2026.
-- The crawler bootstraps from Blake2b seeds, so the Blake2b share of the whole crawl is not an unbiased sample of the Bitcoin network.
+- The crawler bootstraps from BLAKE2b seeds, so the BLAKE2b share of the whole crawl is not an unbiased sample of the Bitcoin network.
 - All timestamps are unix seconds, UTC.
 - Before 2026-09-27 21:28 UTC the samples came from a different seeder (an older dnsseed); the series has a visible step there.
 
 ## The three populations
 
-Fields mix three different sets of Blake2b nodes. Read the population column in the tables below before comparing two numbers.
+Fields mix three different sets of BLAKE2b nodes. Read the population column in the tables below before comparing two numbers.
 
 | Name used here | Meaning | Size field |
 |---|---|---|
-| **rated good** | The seeder's own quality gate: the node is Blake2b, its last successful handshake is under an hour old, it is on port 8333 (any port for I2P), it advertises `NODE_NETWORK`, reports protocol >= 70001 and a height at or above the fork, and has a sustained reliability record. Because `NODE_NETWORK` is required, **pruned nodes (which advertise only `NODE_NETWORK_LIMITED`) are never rated good.** Defined in LionSeed `src/node.rs`, `is_good()`. | `b2b_reachable` |
-| **polled recently** | Every Blake2b node whose last successful handshake is less than 4980 seconds (83 minutes) old when the sample is taken. Archival and pruned nodes alike. (`tools/seed-census`, the `age < 4980` test.) | `b2b_polled_recently` |
-| **known** (`b2b`) | Every Blake2b node the seeder has ever completed a handshake with and still holds. The seeder never drops a node that has answered, however long it has been offline, so this grows almost monotonically. It can dip by one or two when a node's later handshake no longer advertises bit 28. | `b2b` |
+| **rated good** | The seeder's own quality gate: the node is BLAKE2b, its last successful handshake is under an hour old, it is on port 8333 (any port for I2P), it advertises `NODE_NETWORK`, reports protocol >= 70001 and a height at or above the fork, and has a sustained reliability record. Because `NODE_NETWORK` is required, **pruned nodes (which advertise only `NODE_NETWORK_LIMITED`) are never rated good.** Defined in LionSeed `src/node.rs`, `is_good()`. | `b2b_reachable` |
+| **polled recently** | Every BLAKE2b node whose last successful handshake is less than 4980 seconds (83 minutes) old when the sample is taken. Archival and pruned nodes alike. (`tools/seed-census`, the `age < 4980` test.) | `b2b_polled_recently` |
+| **known** (`b2b`) | Every BLAKE2b node the seeder has ever completed a handshake with and still holds. The seeder never drops a node that has answered, however long it has been offline, so this grows almost monotonically. It can dip by one or two when a node's later handshake no longer advertises bit 28. | `b2b` |
 
-Note the naming: in the JSON, `b2b_reachable` means **rated good**, not "polled recently". The live page's headline "Blake2b nodes reachable" is the polled-recently figure (`storage_archival + storage_pruned + storage_other`).
+Note the naming: in the JSON, `b2b_reachable` means **rated good**, not "polled recently". The live page's headline "BLAKE2b nodes reachable" is the polled-recently figure (`storage_archival + storage_pruned + storage_other`).
 
 ## Field reference
 
@@ -71,12 +71,12 @@ The latest sample. One JSON object.
 |---|---|---|---|
 | `ts` | int | - | When the sample was taken (unix seconds). |
 | `dump_ts` | int | - | Modification time of the seeder dump the sample was read from. |
-| `total` | int | all chains | Rows in the seeder dump: every address the seeder has tried at least once, Blake2b or not, answered or not. |
-| `reachable` | int | rated good, all chains | Rows marked good in the dump. LionSeed only rates Blake2b nodes good, so this currently always equals `b2b_reachable`. |
-| `b2b` | int | known | Blake2b nodes the seeder holds. |
-| `b2b_reachable` | int | rated good | Blake2b nodes rated good. |
-| `b2b_polled_recently` | int | polled recently | Blake2b nodes with a successful handshake in the last 4980 s. |
-| `b2b_poll_age_median` | int | known | Median seconds since last successful handshake, over all known Blake2b nodes. |
+| `total` | int | all chains | Rows in the seeder dump: every address the seeder has tried at least once, BLAKE2b or not, answered or not. |
+| `reachable` | int | rated good, all chains | Rows marked good in the dump. LionSeed only rates BLAKE2b nodes good, so this currently always equals `b2b_reachable`. |
+| `b2b` | int | known | BLAKE2b nodes the seeder holds. |
+| `b2b_reachable` | int | rated good | BLAKE2b nodes rated good. |
+| `b2b_polled_recently` | int | polled recently | BLAKE2b nodes with a successful handshake in the last 4980 s. |
+| `b2b_poll_age_median` | int | known | Median seconds since last successful handshake, over all known BLAKE2b nodes. |
 | `b2b_poll_age_p90` | int | known | 90th percentile of the same. |
 | `b2b_poll_age_max` | int | known | Maximum of the same. |
 | `storage_archival` | int | polled recently | Nodes advertising `NODE_NETWORK` (serve the full chain). |
@@ -104,8 +104,8 @@ An array, oldest first, one object per sample, last 2000 samples.
 | Field | Type | Meaning |
 |---|---|---|
 | `ts` | int | Sample time. |
-| `b2b` | int | Known Blake2b nodes. |
-| `b2b_reachable` | int | Rated-good Blake2b nodes. |
+| `b2b` | int | Known BLAKE2b nodes. |
+| `b2b_reachable` | int | Rated-good BLAKE2b nodes. |
 | `max_height` | int | As in `data.json`. |
 | `enforcing` | int | Rated-good nodes whose user agent enforces the policy currently in force. The whole series is rescored with today's policy every hour, so this is not what was enforcing at the time in any historical sense. For the per-epoch view use `policy-history.json`. |
 
@@ -143,14 +143,14 @@ An array, oldest first, one object per sample, built from the full sample series
 | Field | Type | Meaning |
 |---|---|---|
 | `ts` | int | Sample time. |
-| `b2b_reachable` | int | Rated-good Blake2b nodes. |
+| `b2b_reachable` | int | Rated-good BLAKE2b nodes. |
 | `buckets` | object | `{"pre": n, "<policy id>": n, ...}`. Each rated-good node is counted once, under the newest policy its software enforces, else `"pre"`. Every policy id in `policies.json` is present, zero-filled. Buckets sum to `b2b_reachable`. |
 
 Samples whose `versions` counts do not sum to `b2b_reachable` are skipped (`tools/gen_policy_history.py`), so this file can have fewer points than `history.json` over the same period.
 
 ### stable-nodes.json
 
-Rated-good Blake2b nodes with their uptime figures, meant as evidence for someone curating a fixed seed list, not as a list to serve unexamined. Software versions are deliberately not paired with addresses (`tools/seed-stable.py`).
+Rated-good BLAKE2b nodes with their uptime figures, meant as evidence for someone curating a fixed seed list, not as a list to serve unexamined. Software versions are deliberately not paired with addresses (`tools/seed-stable.py`).
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -161,7 +161,7 @@ Rated-good Blake2b nodes with their uptime figures, meant as evidence for someon
 | `qualifying_count` | int | Length of `nodes`. |
 | `observed_count` | int | Length of `all_reachable`. |
 | `nodes` | array | The qualifying entries. |
-| `all_reachable` | array | Every rated-good Blake2b node, qualifying or not, sorted by uptime in `window` descending. |
+| `all_reachable` | array | Every rated-good BLAKE2b node, qualifying or not, sorted by uptime in `window` descending. |
 
 Each entry in `nodes` / `all_reachable`:
 
@@ -175,7 +175,7 @@ Each entry in `nodes` / `all_reachable`:
 
 ### seeds.txt
 
-The Blake2b rows of the seeder's dump, in the `dnsseed.dump` text format that Knots' `contrib/seeds/makeseeds.py` reads. Line 1 is a `#` header; then one row per **known** Blake2b node (good or not), whitespace-separated, good rows first, then by the seeder's internal 30-day reliability. That ordering uses the figure before the scaling described under `%(30d)` below, so the printed column can look out of order.
+The BLAKE2b rows of the seeder's dump, in the `dnsseed.dump` text format that Knots' `contrib/seeds/makeseeds.py` reads. Line 1 is a `#` header; then one row per **known** BLAKE2b node (good or not), whitespace-separated, good rows first, then by the seeder's internal 30-day reliability. That ordering uses the figure before the scaling described under `%(30d)` below, so the printed column can look out of order.
 
 | Column | Meaning |
 |---|---|
@@ -184,7 +184,7 @@ The Blake2b rows of the seeder's dump, in the `dnsseed.dump` text format that Kn
 | lastSuccess | Unix time of the last successful handshake. |
 | %(2h) %(8h) %(1d) %(7d) %(30d) | Exponentially weighted success rate over each window, as a percentage. LionSeed scales each figure by how much of the window has passed since it first saw the node, so time before discovery counts as downtime (LionSeed `src/dump.rs`). |
 | blocks | Block height reported at the last handshake. |
-| svcs | Service bits from the last handshake, 8 hex digits. First digit odd = bit 28 (Blake2b). |
+| svcs | Service bits from the last handshake, 8 hex digits. First digit odd = bit 28 (BLAKE2b). |
 | version | Protocol version. |
 | user agent | The rest of the line, in double quotes (quotes and control characters removed from the string itself). |
 
@@ -205,7 +205,7 @@ Validation rules (strictly increasing activation and minimum version, no overlap
 
 ## Privacy
 
-The JSON files carry only aggregates, except `stable-nodes.json`, which lists addresses with uptime but no software version. `seeds.txt` lists the addresses of Blake2b nodes that accept incoming connections: addresses any crawler can find, with the details each node reports about itself in its handshake. It goes further than a DNS seed's answers in three ways: it includes per-node uptime figures, it includes nodes that are not currently rated good, and git history keeps every hourly version. Addresses of non-Blake2b nodes are not published.
+The JSON files carry only aggregates, except `stable-nodes.json`, which lists addresses with uptime but no software version. `seeds.txt` lists the addresses of BLAKE2b nodes that accept incoming connections: addresses any crawler can find, with the details each node reports about itself in its handshake. It goes further than a DNS seed's answers in three ways: it includes per-node uptime figures, it includes nodes that are not currently rated good, and git history keeps every hourly version. Addresses of non-BLAKE2b nodes are not published.
 
 ## Support
 

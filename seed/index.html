@@ -207,10 +207,10 @@ footer p {
 
 <header>
   <h1>seed.thelionpool.org</h1>
-  <p class="lede">A DNS seed for post-fork Bitcoin Knots nodes. This page
+  <p class="lede">A DNS seed for BLAKE2b Bitcoin Knots nodes. This page
   documents how the seed is operated, as encouraged by point 6 of
   <code>doc/dnsseed-policy.md</code>.</p>
-  <p class="updated">Last updated 2026-10-05</p>
+  <p class="updated">Last updated 2026-10-30</p>
 </header>
 
 <h2>Operator</h2>
@@ -225,7 +225,7 @@ footer p {
 <h2>What it serves</h2>
 <dl>
   <dt>Network</dt>
-  <dd>Bitcoin, post-fork. Fork height 961640.</dd>
+  <dd>Bitcoin, the BLAKE2b chain. Fork height 961640.</dd>
   <dt>Software</dt>
   <dd>LionSeed, a DNS seeder written from scratch for the Bitcoin network
   (Rust, MIT licence). It is a live crawler, not a static host list. It crawls
@@ -244,17 +244,17 @@ footer p {
   <dd>A dedicated VPS located in Germany. Monitored with external alerting.</dd>
 </dl>
 
-<h2>Only post-fork nodes, under any query</h2>
+<h2>Only BLAKE2b nodes, under any query</h2>
 <p>Every service-bit filter of the form <code>x&lt;hex&gt;</code> is accepted,
 for example <code>x10000009</code> (<code>NODE_NETWORK|NODE_WITNESS|NODE_BLAKE2B</code>)
 or <code>x9</code>. A bare hostname query uses <code>x9</code>.</p>
 <p>Whatever the filter, the only nodes that can ever appear in an answer are
-nodes this seed has itself confirmed to be post-fork. So a bare or
-<code>x9</code> query never returns a pre-fork node. This is a deliberate
+nodes this seed has itself confirmed to be BLAKE2b nodes. So a bare or
+<code>x9</code> query never returns a SHA256d node. This is a deliberate
 deviation from stock seeder behaviour.</p>
-<p>The reason: post-fork nodes share port 8333 with the much larger SHA256d network.
+<p>The reason: BLAKE2b nodes share port 8333 with the much larger SHA256d network.
 An unfiltered answer would be composed mostly of peers that are useless to a
-post-fork node.</p>
+BLAKE2b node.</p>
 
 <h2>How nodes are chosen</h2>
 <p>A node is served only when all of these hold:</p>
@@ -264,7 +264,7 @@ post-fork node.</p>
   Service bits gossiped by other peers are never trusted on their own.</li>
   <li>It reported a height of at least 961640 and advertises
   <code>NODE_NETWORK</code>.</li>
-  <li>It answered a handshake within the last hour. Post-fork nodes are re-checked
+  <li>It answered a handshake within the last hour. BLAKE2b nodes are re-checked
   every 15 minutes, so a node that goes away drops out of answers quickly.</li>
   <li>It has a good reliability record over recent checks.</li>
 </ul>
@@ -274,7 +274,7 @@ answer. DNS answers carry clearnet addresses only. Tor and I2P nodes are
 crawled for the census and the crawl data, since DNS cannot carry those
 addresses.</p>
 <p>The seed does not filter by user agent or node version. Any node that
-follows the post-fork consensus rules is treated the same.</p>
+follows the BLAKE2b chain's consensus rules is treated the same.</p>
 
 <h2>How to use it</h2>
 <p>Query the seed directly:</p>
@@ -290,9 +290,9 @@ Node counts and other current figures are on the <a href="../">census</a>.</p>
 <p>The seed has run LionSeed since 2026-09-27 at 21:28 UTC. Before that it ran a
 patched fork of <code>sipa/bitcoin-seeder</code>. The seed hostname, nameserver
 and IP address did not change.</p>
-<p>LionSeed re-checks post-fork nodes every 15 minutes. Addresses it has not tried
+<p>LionSeed re-checks BLAKE2b nodes every 15 minutes. Addresses it has not tried
 yet come next, then addresses it tried but could not classify, retried every
-6 hours, then pre-fork nodes, checked once a day. It asks each node for
+6 hours, then SHA256d nodes, checked once a day. It asks each node for
 addresses at most once a day.</p>
 
 <h2>Policy compliance</h2>
@@ -316,7 +316,7 @@ addresses at most once a day.</p>
 <p>No compliance is claimed beyond the points listed above.</p>
 
 <footer>
-  <p>Last updated 2026-10-05.</p>
+  <p>Last updated 2026-10-30.</p>
   <p>Contact: <a href="mailto:knots.seed@gmail.com">knots.seed@gmail.com</a></p>
 </footer>
 
