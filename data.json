@@ -2,12 +2,12 @@
  "activation_end_height": 979919,
  "activation_height": 973440,
  "b2b": 2462,
- "b2b_poll_age_max": 2795268,
+ "b2b_poll_age_max": 2798870,
  "b2b_poll_age_median": 1079,
- "b2b_poll_age_p90": 1469452,
- "b2b_polled_recently": 1610,
- "b2b_reachable": 1112,
- "dump_ts": 1793349020,
+ "b2b_poll_age_p90": 1473054,
+ "b2b_polled_recently": 1609,
+ "b2b_reachable": 1107,
+ "dump_ts": 1793352627,
  "enforcing_versions": [
   "/Satoshi:29.4.2(Undersector XBT)/Knots:20260508/",
   "/Satoshi:29.4.2(XBT-NGU)/Knots:20260508/",
@@ -35,21 +35,21 @@
  "heights": {
   "behind": 0,
   "day": 0,
-  "near": 1099,
-  "tip": 13
+  "near": 1097,
+  "tip": 10
  },
  "heights_by_enforcement": {
   "enforcing": {
    "behind": 0,
    "day": 0,
-   "near": 1015,
-   "tip": 11
+   "near": 1011,
+   "tip": 10
   },
   "not_enforcing": {
    "behind": 0,
    "day": 0,
-   "near": 84,
-   "tip": 2
+   "near": 86,
+   "tip": 0
   }
  },
  "heights_by_version": {
@@ -74,14 +74,14 @@
   "/Satoshi:29.4.1/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 36,
-   "tip": 1
+   "near": 37,
+   "tip": 0
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
    "behind": 0,
    "day": 0,
-   "near": 35,
-   "tip": 1
+   "near": 36,
+   "tip": 0
   },
   "/Satoshi:29.4.1/Knots:20260508rc5/": {
    "behind": 0,
@@ -116,8 +116,8 @@
   "/Satoshi:29.4.2/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 429,
-   "tip": 5
+   "near": 428,
+   "tip": 3
   },
   "/Satoshi:29.4.2/Knots:20260508/Plumb:6/": {
    "behind": 0,
@@ -158,8 +158,8 @@
   "/Satoshi:29.4.3(Kilombino)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
-   "tip": 1
+   "near": 2,
+   "tip": 0
   },
   "/Satoshi:29.4.3(MiniBolt node)/Knots:20260508/": {
    "behind": 0,
@@ -188,8 +188,8 @@
   "/Satoshi:29.4.3/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 525,
-   "tip": 5
+   "near": 521,
+   "tip": 7
   },
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:8/PyBLOCK Crew/": {
    "behind": 0,
@@ -222,12 +222,12 @@
    "tip": 0
   }
  },
- "max_height": 979686,
+ "max_height": 979692,
  "networks": {
-  "i2p": 504,
+  "i2p": 503,
   "ipv4": 172,
   "ipv6": 41,
-  "tor": 395
+  "tor": 391
  },
  "next_policy": {
   "activation": 979919,
@@ -258,22 +258,22 @@
   "name": "Long coinbase maturity",
   "short": "45-day maturity"
  },
- "reachable": 1112,
- "storage_archival": 1187,
+ "reachable": 1107,
+ "storage_archival": 1180,
  "storage_other": 0,
- "storage_pruned": 423,
- "total": 188685,
- "ts": 1793349299,
+ "storage_pruned": 429,
+ "total": 188705,
+ "ts": 1793352901,
  "versions": {
   "/GrayersDad:10.27.2026=BLAKE2b/": 3,
   "/OracleKnots:29.4.3(Forever Money)/OracleKnots:20260508.plumb8/": 3,
   "/Satoshi:29.4.1/Knots:20260508/": 38,
   "/Satoshi:29.4.1/Knots:20260508rc4/": 36,
   "/Satoshi:29.4.1/Knots:20260508rc5/": 6,
-  "/Satoshi:29.4.2/Knots:20260508/": 439,
+  "/Satoshi:29.4.2/Knots:20260508/": 436,
   "/Satoshi:29.4.2/Knots:20260508/Plumb:6/": 1,
   "/Satoshi:29.4.2/Knots:20260508rc2/": 8,
-  "/Satoshi:29.4.3/Knots:20260508/": 547,
+  "/Satoshi:29.4.3/Knots:20260508/": 545,
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:8/PyBLOCK Crew/": 2,
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": 3,
   "/Satoshi:29.4.3/Knots:20260508/Plumb:7/": 2,
@@ -297,7 +297,7 @@
    "pruned": 0
   },
   "/Satoshi:29.4.1/Knots:20260508/": {
-   "archival": 39,
+   "archival": 40,
    "other": 0,
    "pruned": 27
   },
@@ -312,9 +312,9 @@
    "pruned": 1
   },
   "/Satoshi:29.4.2/Knots:20260508/": {
-   "archival": 461,
+   "archival": 455,
    "other": 0,
-   "pruned": 154
+   "pruned": 159
   },
   "/Satoshi:29.4.2/Knots:20260508/Plumb:6/": {
    "archival": 1,
@@ -327,9 +327,9 @@
    "pruned": 3
   },
   "/Satoshi:29.4.3/Knots:20260508/": {
-   "archival": 588,
+   "archival": 586,
    "other": 0,
-   "pruned": 230
+   "pruned": 231
   },
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:8/PyBLOCK Crew/": {
    "archival": 2,
