@@ -1,6 +1,6 @@
 # Bitcoin Node Census
 
-An hourly count of the reachable post-fork (BLAKE2b, service bit 28) Bitcoin nodes, taken by crawling the network from one independent DNS seed, `seed.thelionpool.org`. Every hour the seed host writes a new sample, turns it into the JSON and text files in this repository and pushes them here. The page at https://lionthunderfingers.github.io/Bitcoin-Node-census/ reads the same files. The seeder that does the crawling is https://github.com/LionThunderFingers/LionSeed.
+An hourly count of the reachable Blake2b (service bit 28) Bitcoin nodes, taken by crawling the network from one independent DNS seed, `seed.thelionpool.org`. Every hour the seed host writes a new sample, turns it into the JSON and text files in this repository and pushes them here. The page at https://lionthunderfingers.github.io/Bitcoin-Node-census/ reads the same files. The seeder that does the crawling is https://github.com/LionThunderFingers/LionSeed.
 
 ## Using the data
 
@@ -45,7 +45,7 @@ The first published `data.json` is from 2026-09-19; `seeds.txt` starts on 2026-0
 - Only nodes that accept incoming connections can be seen. Nodes behind NAT that never listen are invisible, so every count is a lower bound.
 - A node is Blake2b if it advertises service bit 28 (`0x10000000`, `NODE_BLAKE2B`). That bit is taken only from the node's own handshake, never from addresses gossiped by other peers.
 - Clearnet (IPv4, IPv6), Tor and I2P are crawled. Tor and I2P since 27 Sep 2026.
-- The crawler bootstraps from Blake2b seeds, so the post-fork share of the whole crawl is not an unbiased sample of the Bitcoin network.
+- The crawler bootstraps from Blake2b seeds, so the Blake2b share of the whole crawl is not an unbiased sample of the Bitcoin network.
 - All timestamps are unix seconds, UTC.
 - Before 2026-09-27 21:28 UTC the samples came from a different seeder (an older dnsseed); the series has a visible step there.
 

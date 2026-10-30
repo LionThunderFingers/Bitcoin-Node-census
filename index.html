@@ -208,9 +208,9 @@ details.dt p+p{margin-top:9px}
 
   <div class="figures" aria-label="Key figures, updated hourly">
     <div class="fig lead"><div class="v num" id="figUp"></div>
-      <div class="k" id="figUpK">post-fork nodes rated good</div><div class="note" id="figUpNote">by the seeder&rsquo;s own quality gate</div></div>
+      <div class="k" id="figUpK">Blake2b nodes rated good</div><div class="note" id="figUpNote">by the seeder&rsquo;s own quality gate</div></div>
     <div class="fig"><div class="v num" id="figB2"></div>
-      <div class="k">post-fork nodes ever seen</div>
+      <div class="k">Blake2b nodes ever seen</div>
       <div class="note" id="figB2Note"></div>
       <details class="dt"><summary>what is this?</summary>
         <div class="note" id="figB2Bias"></div>
@@ -218,9 +218,9 @@ details.dt p+p{margin-top:9px}
     <div class="fig"><div class="v num" id="figCrawl"></div>
       <div class="k">nodes crawled overall</div><div class="note">both chains share port 8333</div></div>
     <div class="fig"><div class="v num" id="figTip"></div>
-      <div class="k">highest block seen</div><div class="note">across post-fork nodes</div></div>
+      <div class="k">highest block seen</div><div class="note">across Blake2b nodes</div></div>
     <div class="fig"><div class="v num" id="figFresh"></div>
-      <div class="k" id="figFreshK">of post-fork nodes were polled recently</div>
+      <div class="k" id="figFreshK">of Blake2b nodes were polled recently</div>
       <details class="dt"><summary>what is this?</summary>
         <div class="note" id="figFreshNote"></div>
       </details></div>
@@ -266,16 +266,16 @@ details.dt p+p{margin-top:9px}
                 advertises, and completes a Bitcoin handshake,
                 recording the services, block height and software it reports. Nothing here is
                 second-hand.</li>
-            <li>Post-fork nodes are identified by service bit 28
+            <li>Blake2b nodes are identified by service bit 28
                 (<span class="num">0x10000000</span>, <span class="num">NODE_BLAKE2B</span>), taken
                 only from the node&rsquo;s own handshake, never from addresses gossiped by other
                 peers.</li>
             <li>Clearnet, Tor and I2P nodes are all crawled (Tor and I2P since 27 Sep 2026).</li>
-            <li>A node reporting the post-fork bit while running software with no BLAKE2b support is
+            <li>A node reporting the Blake2b bit while running software with no Blake2b support is
                 still counted, but flagged, since it is either misconfigured or misreporting.</li>
             <li><strong>&ldquo;Rated good&rdquo; is conservative.</strong> It is the seeder&rsquo;s
                 internal gate: a handshake within the last hour, correct port, advertised services,
-                protocol version, reported block height and a sustained uptime history. Post-fork nodes
+                protocol version, reported block height and a sustained uptime history. Blake2b nodes
                 are re-checked every 15 minutes. A node can be reachable and still not clear it yet,
                 for example if the crawler has only just found it, so the honest reading is
                 &ldquo;at least this many&rdquo;.</li>
@@ -290,7 +290,7 @@ details.dt p+p{margin-top:9px}
       <div class="sec-head">
         <h2>Policy adoption over time</h2>
         <details class="dt"><summary>what is this?</summary>
-          <p><strong>Rated-good</strong> post-fork nodes grouped by the <strong>newest policy
+          <p><strong>Rated-good</strong> Blake2b nodes grouped by the <strong>newest policy
              their software enforces</strong>, as a share of the rated-good total, over time.
              Each node is counted once, in its highest tier, so the groups sum to 100% and an
              older era visibly hands off to a newer one as nodes upgrade. This series is on the
@@ -336,7 +336,7 @@ details.dt p+p{margin-top:9px}
       </div>
 
       <div class="act-block" id="actRisk" hidden>
-        <h3 id="actRiskHead">Post-fork nodes not on an enforcing release</h3>
+        <h3 id="actRiskHead">Blake2b nodes not on an enforcing release</h3>
         <div class="ne-head">
           <span class="big num" id="neCount"></span>
           <span class="lbl" id="neCountLbl"></span>
@@ -347,9 +347,9 @@ details.dt p+p{margin-top:9px}
 
     <section id="versionsSection" class="span2">
       <div class="sec-head">
-        <h2>Software in use post-fork</h2>
+        <h2>Software in use on Blake2b nodes</h2>
         <details class="dt"><summary>what is this?</summary>
-          <p>One row per release, over the post-fork nodes this crawler polled inside its
+          <p>One row per release, over the Blake2b nodes this crawler polled inside its
              freshness window &mdash; archival and pruned together, the same population as the
              headline count. A node only enforces a new consensus rule if it is running code
              that contains it, so the <strong>Enforces</strong> column is the number that
@@ -398,7 +398,7 @@ details.dt p+p{margin-top:9px}
       <div class="sec-head">
         <h2>Where the reachable nodes are</h2>
         <details class="dt"><summary>what is this?</summary>
-          <p>Post-fork nodes split by the network they are reached on: clearnet
+          <p>Blake2b nodes split by the network they are reached on: clearnet
              (IPv4 / IPv6), Tor v3 and I2P. This crawler connects to all four so the Tor and
              I2P counts are measured, not estimated, most crawlers never reach those
              networks and so under-count or omit them entirely. Like the height table, this is
@@ -416,7 +416,7 @@ details.dt p+p{margin-top:9px}
         <h2>Are nodes agreeing on the chain?</h2>
         <details class="dt"><summary>what is this?</summary>
           <p>Each node reports its block height during the handshake. A cluster stuck well behind
-             the rest is the first visible sign of a chain split, so the post-fork nodes are
+             the rest is the first visible sign of a chain split, so the Blake2b nodes are
              split here into those on an enforcing release and those not, to show whether the
              two groups are drifting apart. This table is on the seeder&rsquo;s
              <strong>rated-good</strong> set, which excludes pruned nodes, not the wider
@@ -453,7 +453,7 @@ details.dt p+p{margin-top:9px}
         <h2>Stable nodes list</h2>
         <details class="dt"><summary>what is this?</summary>
           <p>If you run a <strong>curated, fixed-list</strong> seed rather than a crawler, the hard
-             part is knowing which nodes are actually reliable. This is that evidence: post-fork nodes
+             part is knowing which nodes are actually reliable. This is that evidence: Blake2b nodes
              this crawler has found consistently reachable, with the figures behind the claim.</p>
           <div class="scope" style="margin-top:12px">
             <div class="scope-row">
@@ -472,7 +472,7 @@ details.dt p+p{margin-top:9px}
         <div class="fig lead"><div class="v num" id="stQual"></div>
           <div class="k">nodes meet the bar</div><div class="note" id="stCrit"></div></div>
         <div class="fig"><div class="v num" id="stSeen"></div>
-          <div class="k">post-fork nodes assessed</div><div class="note">those the seeder rates good</div></div>
+          <div class="k">Blake2b nodes assessed</div><div class="note">those the seeder rates good</div></div>
         <div class="fig"><div class="v num" id="stAge"></div>
           <div class="k">days of observation</div><div class="note">longer means a stronger list</div></div>
       </div>

@@ -105,7 +105,7 @@ function checkStaleness(ts) {
     " ago. The census normally updates hourly, so publishing may be delayed.");
 }
 
-// Headline: every post-fork node that answered the crawler recently, archival AND pruned.
+// Headline: every Blake2b node that answered the crawler recently, archival AND pruned.
 // The seeder only rates a node "good" if it advertises NODE_NETWORK, so b2b_reachable (still
 // published unchanged for other consumers) leaves pruned nodes out. A sample without the
 // storage_* fields falls back to the old figure and wording rather than showing a partial sum.
@@ -115,12 +115,12 @@ function renderHeadlineCount(d) {
   const k = document.getElementById("figUpK"), note = document.getElementById("figUpNote");
   if (a === null || p === null || o === null) {
     document.getElementById("figUp").textContent = fmtOr(d.b2b_reachable);
-    k.textContent = "post-fork nodes rated good";
+    k.textContent = "Blake2b nodes rated good";
     note.textContent = "by the seeder’s own quality gate";
     return;
   }
   document.getElementById("figUp").textContent = fmt(a + p + o);
-  k.textContent = "post-fork nodes reachable";
+  k.textContent = "Blake2b nodes reachable";
   note.textContent = fmt(a) + " archival · " + fmt(p) + " pruned" +
     (o > 0 ? " · " + fmt(o) + " other" : "") + ". The software table and the readiness figure " +
     "count all of them; the height table, the network split and the policy chart count only " +
@@ -153,7 +153,7 @@ function render(d) {
 
 // ---- which population a figure is counted over ----
 // Two bases, in preference order:
-//   "storage"  -- versions_storage: every post-fork node polled inside the freshness window,
+//   "storage"  -- versions_storage: every Blake2b node polled inside the freshness window,
 //                 archival and pruned, which is the population the headline count uses, so
 //                 the software table's totals row equals the headline figure;
 //   "versions" -- the older per-release map, over the seeder's rated-good set only, which
@@ -179,7 +179,7 @@ function softwareBasis(d) {
     const total = a + p + o;
     if (rows.length && total > 0) {
       return { kind: "storage", rows, archival: a, pruned: p, other: o, total,
-               label: "post-fork nodes polled in the last " +
+               label: "Blake2b nodes polled in the last " +
                       fmt(POLL_FRESH_SECONDS / 60 | 0) + " minutes" };
     }
   }
@@ -194,7 +194,7 @@ function softwareBasis(d) {
     }
     if (rows.length && total > 0) {
       return { kind: "versions", rows, archival: null, pruned: null, other: null, total,
-               label: "post-fork nodes the seeder rates good" };
+               label: "Blake2b nodes the seeder rates good" };
     }
   }
   return null;
@@ -257,7 +257,7 @@ function readiness(basis, list) {
 // verified from a user-agent string -- listed as unverified, never as failing to enforce.
 function releaseTag(ua) {
   if (/oracle/i.test(ua)) return "unverified third-party build";
-  if (!/Knots/i.test(ua)) return "not Knots, but claims the post-fork bit";
+  if (!/Knots/i.test(ua)) return "not Knots, but claims the Blake2b bit";
   if (/rc\d/i.test(ua)) return "release candidate";
   return "";
 }
@@ -299,7 +299,7 @@ function renderNetworks(d) {
     el("span", { class: "bar-val" }, fmt(n) + "  ·  " + (n / total * 100).toFixed(1) + "%"),
     el("span", { class: "bar-track" },
       el("span", { class: "bar-fill", style: "width:" + (n / max * 100).toFixed(1) + "%" })))));
-  $("networkNote").textContent = "Counts the " + fmt(total) + " post-fork nodes the seeder " +
+  $("networkNote").textContent = "Counts the " + fmt(total) + " Blake2b nodes the seeder " +
     "rates good, which excludes pruned nodes, not the wider recently-polled base used by " +
     "the software table.";
 }
@@ -349,7 +349,7 @@ function renderHeights(d) {
   if (!hbe) {
     msg = "This sample does not publish the height breakdown split by enforcement status, " +
       "so the two groups cannot be compared from it. The figures above are the aggregate " +
-      "over every post-fork node, as before.";
+      "over every Blake2b node, as before.";
   } else if (nb === null) {
     msg = "The non-enforcing group has no height breakdown in this sample, so no comparison " +
       "between the two groups can be drawn from it. Read the aggregate column only.";
@@ -376,8 +376,8 @@ function renderHeights(d) {
   // the reader to infer from the headline tile.
   const good = numOr(d.b2b_reachable, null);
   $("heightsBase").textContent = (good === null
-    ? "Counts the post-fork nodes the seeder rates good"
-    : "Counts the " + fmt(good) + " post-fork nodes the seeder rates good") +
+    ? "Counts the Blake2b nodes the seeder rates good"
+    : "Counts the " + fmt(good) + " Blake2b nodes the seeder rates good") +
     ", which excludes pruned nodes, not the wider recently-polled base used by the software " +
     "table above. The enforcing split here is against " +
     (polShort ? "the " + polShort + " rule, which is in force now" :
@@ -386,7 +386,7 @@ function renderHeights(d) {
     "enforcing figures on this page are not the same measurement.";
 }
 
-// ---- Two context tiles: post-fork share of the crawl, and measurement freshness ----
+// ---- Two context tiles: Blake2b share of the crawl, and measurement freshness ----
 const POLL_FRESH_SECONDS = 4980;
 function pctOf(a, b) {
   const x = numOr(a, null), y = numOr(b, null);
@@ -398,22 +398,22 @@ function pctOf(a, b) {
 const pctStr = p => p === null ? DASH
   : (p > 0 && p < 1 ? p.toFixed(1) : String(Math.round(p))) + "%";
 
-// The post-fork share of the whole crawl used to be its own tile saying the same thing as
+// The Blake2b share of the whole crawl used to be its own tile saying the same thing as
 // this one with a percentage instead of a count. It is now the note under the count.
 function renderContextTiles(d) {
-  // The rated-good share of post-fork nodes used to be quoted here too; LionSeed only rates
-  // post-fork nodes good, so it was always 100% and said nothing.
+  // The rated-good share of Blake2b nodes used to be quoted here too; LionSeed only rates
+  // Blake2b nodes good, so it was always 100% and said nothing.
   const shareAll = pctOf(d.b2b, d.total);
   $("figB2Note").textContent = "including ones not heard from recently" +
     (shareAll === null ? "" : " · " + pctStr(shareAll) + " of the " + fmtOr(d.total) + " nodes crawled");
   $("figB2Bias").textContent =
-    "Every post-fork node the crawler has completed a handshake with and still remembers, " +
+    "Every Blake2b node the crawler has completed a handshake with and still remembers, " +
     "however long ago. It is not a count of nodes online now; nodes that went offline or " +
     "changed address stay in it. The headline figure is the online count. " +
     (shareAll === null ? "" : pctStr(shareAll) + " of every node this crawler has tried " +
-      "is post-fork. ") +
-    "The crawler bootstraps from post-fork seeds, so that is not an unbiased sample of the " +
-    "whole Bitcoin network. It overstates the post-fork share of it.";
+      "is a Blake2b node. ") +
+    "The crawler bootstraps from Blake2b seeds, so that is not an unbiased sample of the " +
+    "whole Bitcoin network. It overstates the Blake2b share of it.";
 
   const fresh = pctOf(d.b2b_polled_recently, d.b2b);
   const med = numOr(d.b2b_poll_age_median, null);
@@ -543,19 +543,19 @@ function renderNotEnforcing(basis, rd, named, risk) {
   if (!basis || rd === null) { risk.hidden = true; return; }
   risk.hidden = false;
   $("actRiskHead").textContent = named
-    ? "Post-fork nodes not on a release enforcing " + named
-    : "Post-fork nodes not on a release enforcing the rule";
+    ? "Blake2b nodes not on a release enforcing " + named
+    : "Blake2b nodes not on a release enforcing the rule";
   $("neCount").textContent = basis.total > 0 ? fmt(rd.notReady) : DASH;
   $("neCountLbl").textContent = basis.total > 0
     ? "of the " + fmt(basis.total) + " " + basis.label
-    : "no post-fork nodes counted, so there is nothing to measure against";
+    : "no Blake2b nodes counted, so there is nothing to measure against";
   $("neNote").textContent = "Counts come from the user agent each node reported, matched " +
     "against the list of enforcing releases in the published sample. Which release each " +
     "node runs is in the software table below. A node on an older release is only on a " +
     "different chain once a block actually breaks the rule.";
 }
 
-// ---- Software in use post-fork: ONE table, one row per canonical release ----
+// ---- Software in use on Blake2b nodes: ONE table, one row per canonical release ----
 // Merges what used to be four panels: the version bars, the archival/pruned split, the
 // release-adoption table and the per-version not-enforcing list. Current counts come from
 // data.json (versions_storage when published, else versions), first-seen and peak from
@@ -663,7 +663,7 @@ function renderSoftware() {
   const head = !basis
     ? "This sample publishes no per-release counts."
     : basis.kind === "storage"
-      ? fmt(basis.total) + " post-fork nodes completed a handshake in the last " +
+      ? fmt(basis.total) + " Blake2b nodes completed a handshake in the last " +
         fmt(POLL_FRESH_SECONDS / 60 | 0) + " minutes: " + fmt(basis.archival) + " archival, " +
         fmt(basis.pruned) + " pruned" +
         (basis.other > 0 ? ", " + fmt(basis.other) + " advertising neither" : "") +
@@ -764,7 +764,7 @@ function renderStable(s) {
 }
 
 // ---- policy adoption over time (policy-history.json): exclusive buckets ----
-// Reachable post-fork nodes grouped by the newest policy their software enforces, each as a
+// Reachable Blake2b nodes grouped by the newest policy their software enforces, each as a
 // share of the reachable total, over time. Absent/short series hide the whole section.
 let POLICY_SERIES = null;        // {pts:[{ts,reach,buckets}], ids:[...], labels:{}}
 let POLICY_LABELS = {};
@@ -899,7 +899,7 @@ function drawPolicyChart() {
     legend.push({ id, col, pct: shareAt(last, id) });
   });
 
-  const aria = "Multi-line chart: rated-good post-fork nodes grouped by the newest policy their " +
+  const aria = "Multi-line chart: rated-good Blake2b nodes grouped by the newest policy their " +
     "software enforces, each a percentage of the rated-good total, over time, the groups summing to 100.";
   host.insertAdjacentHTML("afterbegin",
     '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' +
@@ -917,7 +917,7 @@ function drawPolicyChart() {
   const last = pts[pts.length - 1];
   $("pcCap").textContent = fmt(pts.length) + " samples, " + utcLabel(pts[0].ts) + " to " +
     utcLabel(last.ts) + ". Each node counted once, in the newest policy its software " +
-    "enforces, as a share of the " + fmt(last.reach) + " post-fork nodes the seeder rated " +
+    "enforces, as a share of the " + fmt(last.reach) + " Blake2b nodes the seeder rated " +
     "good at the latest sample — not the wider recently-polled base used by the software " +
     "table, so pruned nodes are not in this chart. A lower bound measured by one crawler. " +
     "Dashed lines mark the first time the crawler saw a final (non-candidate) build of each " +
