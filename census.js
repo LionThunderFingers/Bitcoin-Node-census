@@ -34,6 +34,8 @@ function largestRemainder(values) {
   return out;
 }
 const days = b => (Math.abs(b) < 0.05 ? 0 : b * 10 / 60 / 24).toFixed(1);
+const utcDate = t => new Date(t * 1000).toLocaleDateString("en-GB",
+  { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const esc = v => String(v).replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const $ = id => document.getElementById(id);
@@ -218,6 +220,7 @@ function policyTargets(d) {
     name: nameOf(obj(d.policy)) || nameOf(fromFile),
     activation: act,
     end: numOr(d.activation_end_height, null),
+    endTime: numOr(d.activation_end_time, null),
     list: Array.isArray(d.enforcing_versions) ? d.enforcing_versions : null
   };
 
@@ -225,7 +228,7 @@ function policyTargets(d) {
   let next = null;
   if (dn && numOr(dn.activation, null) !== null) {
     next = { name: nameOf(dn), activation: numOr(dn.activation, null),
-             end: numOr(dn.end, null),
+             end: numOr(dn.end, null), endTime: numOr(dn.end_time, null),
              list: Array.isArray(dn.enforcing_versions) ? dn.enforcing_versions : null };
   } else if (!("next_policy" in d) && tip !== null) {
     // The field being absent means "this publisher does not know about next policies";
@@ -235,7 +238,8 @@ function policyTargets(d) {
                    .sort((x, y) => numOr(x.activation, 0) - numOr(y.activation, 0));
     if (fut.length) {
       next = { name: nameOf(fut[0]), activation: numOr(fut[0].activation, null),
-               end: numOr(fut[0].end, null), list: null };
+               end: numOr(fut[0].end, null), endTime: numOr(fut[0].end_time, null),
+               list: null };
     }
   }
   return { cur, next };
@@ -487,9 +491,11 @@ function renderActivation() {
     if (cur.activation !== null && tip >= cur.activation) {
       windowLine.textContent = (cur.name ? cur.name : "The current rule") +
         " is in force now, from block " + fmt(cur.activation) +
-        (cur.end !== null && cur.end > cur.activation
-          ? " through block " + fmt(cur.end - 1) + "."
-          : ".");
+        (cur.endTime !== null
+          ? " until RDTS expires on " + utcDate(cur.endTime) + "."
+          : cur.end !== null && cur.end > cur.activation
+            ? " through block " + fmt(cur.end - 1) + "."
+            : ".");
       windowLine.hidden = false;
     } else {
       windowLine.hidden = true;
@@ -511,6 +517,24 @@ function renderActivation() {
   const elapsed = tip - act;
 
   title.textContent = named ? named + " is in force" : "A consensus rule is in force";
+
+  // A rule that ends by time (RDTS expiry, judged on median time past) has no honest end
+  // height, so the window and the countdown are told in dates instead of blocks.
+  if (target.endTime !== null) {
+    const left = Math.max(0, Math.round((target.endTime * 1000 - Date.now()) / 86400000));
+    windowLine.textContent = "Took effect at block " + fmt(act) +
+      " and is in force until RDTS expires on " + utcDate(target.endTime) +
+      ", about " + fmt(left) + " days from now.";
+    windowLine.hidden = false;
+    setTile("cdBlocks", fmt(elapsed), "blocks since it took effect",
+      "about " + days(elapsed) + " days, at ~10 min/block");
+    setTile("cdDays", fmt(left), "days until RDTS expires on " + utcDate(target.endTime),
+      "the end is set by time (median time past), not by a block height");
+    setTile("cdReady", readyPct, readyLbl, readySub);
+    renderNotEnforcing(basis, rd, named, risk);
+    return;
+  }
+
   windowLine.textContent = lastBlock === null
     ? "Took effect at block " + fmt(act) + "."
     : "Took effect at block " + fmt(act) + " and is in force through block " + fmt(lastBlock) +

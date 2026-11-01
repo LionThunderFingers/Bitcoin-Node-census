@@ -92,8 +92,9 @@ The latest sample. One JSON object.
 | `policy` | object | - | `{id, name, short}` of the policy epoch in force at `max_height` (or the first epoch, before any has activated). From `policies.json`. |
 | `activation_height` | int | - | `activation` of that epoch. |
 | `activation_end_height` | int | - | `end` of that epoch. |
+| `activation_end_time` | int | - | Only present when that epoch ends by time rather than height: its `end_time` (unix seconds, compared against median time past). When present, `activation_end_height` is only a bucketing bound, not the real end. |
 | `enforcing_versions` | array of string | - | Every user agent appearing in `versions`, `versions_storage` or `heights_by_version` that enforces the current policy, sorted. Contains both canonical and as-reported forms, so it can be matched by exact string against any of those three maps. |
-| `next_policy` | object or null | - | The next epoch that has not activated yet: `{id, name, short, activation, end, enforcing_versions}`, where `enforcing_versions` is scored against that epoch's own minimum version. `null` once the last epoch in `policies.json` has activated. |
+| `next_policy` | object or null | - | The next epoch that has not activated yet: `{id, name, short, activation, end, enforcing_versions}`, where `enforcing_versions` is scored against that epoch's own minimum version. `null` once the last epoch in `policies.json` has activated. Also carries `end_time` when that epoch has one. |
 
 **Which software counts as enforcing.** Only a user agent that starts with an official Knots release string, `/Satoshi:X.Y.Z(optional comment)/Knots:YYYYMMDD(optional rcN)/`, at or above the epoch's `enforcing_min_version`. Anything after that prefix is ignored. Renamed forks, plain `/Satoshi:X/`, dev builds and malformed strings are not enforcing. See `tools/policy_model.py`, `classify_enforcing()`, and the test table in `tools/seed-publish --self-test`.
 
@@ -199,6 +200,7 @@ The consensus-policy epochs, in increasing activation order. Hand-edited data, n
 | `short` | string | Short display name. |
 | `activation` | int | Block height at which the rule takes effect. |
 | `end` | int | Block height at which the epoch ends (exclusive: an epoch is in force for `activation <= height < end`). |
+| `end_time` | int, optional | For a rule that ends by time instead (for example at RDTS expiry): unix seconds, compared against median time past. `end` is then an upper height bound used only for bucketing. |
 | `enforcing_min_version` | string | Oldest Knots release (`X.Y.Z`) that enforces the rule. |
 
 Validation rules (strictly increasing activation and minimum version, no overlap) are in `tools/policy_model.py`, `parse_policies()`.

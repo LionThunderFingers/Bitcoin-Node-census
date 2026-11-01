@@ -408,6 +408,10 @@ cur = current_policy(policies, max_height) or policies[0]
 min_version = cur["min_version"]
 d["activation_height"] = cur["activation"]
 d["activation_end_height"] = cur["end"]
+# Additive: when the rule ends by time (median time past), say so; the page prefers it over
+# the height, which is then only the bucketing bound.
+if cur.get("end_time") is not None:
+    d["activation_end_time"] = cur["end_time"]
 
 # Merge versions whose only difference is a -uacomment under their canonical key, so
 # every downstream reader of d["versions"] (the page's own JS included) sees one row per

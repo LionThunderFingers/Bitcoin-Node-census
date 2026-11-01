@@ -96,6 +96,12 @@ def parse_policies(text):
             if not isinstance(item[k], int) or isinstance(item[k], bool):
                 raise SystemExit("policy %r has a non-integer %s" % (pid, k))
         activation, end = item["activation"], item["end"]
+        # Optional: a rule that ends by time (median time past, unix seconds) rather than at a
+        # height, e.g. at RDTS expiry. "end" then stays the height bound for bucketing only.
+        end_time = item.get("end_time")
+        if end_time is not None and (not isinstance(end_time, int) or isinstance(end_time, bool)
+                                     or end_time <= 0):
+            raise SystemExit("policy %r has a non-positive or non-integer end_time" % pid)
         if not isinstance(item["enforcing_min_version"], str):
             raise SystemExit("policy %r enforcing_min_version must be a string" % pid)
         min_version = parse_min_version(item["enforcing_min_version"])
@@ -113,7 +119,8 @@ def parse_policies(text):
         prev_activation, prev_end, prev_min = activation, end, min_version
         out.append({
             "id": pid, "name": str(item["name"]), "short": str(item["short"]),
-            "activation": activation, "end": end, "min_version": min_version,
+            "activation": activation, "end": end, "end_time": end_time,
+            "min_version": min_version,
         })
     return out
 
@@ -229,6 +236,8 @@ def next_policy_block(policies, max_height, uas):
         "end": p["end"],
         "enforcing_versions": enforcing_versions(uas, p["min_version"]),
     })
+    if p.get("end_time") is not None:
+        out["end_time"] = p["end_time"]
     return out
 
 
@@ -402,6 +411,20 @@ def _run_self_test():
         '[{"id":"a","name":"a","short":"a","activation":973440,"end":979920,"enforcing_min_version":29.40}]'))
     expect_raises("float activation", lambda: parse_policies(
         '[{"id":"a","name":"a","short":"a","activation":973440.5,"end":979920,"enforcing_min_version":"29.4.2"}]'))
+    # optional end_time: absent -> None, present -> carried through to next_policy
+    check("end_time absent", parse_policies('[%s]' % _base)[0]["end_time"], None)
+    _timed = parse_policies('[%s,%s]' % (_base,
+        '{"id":"b","name":"b","short":"b","activation":979920,"end":1050000,"end_time":1819756800,'
+        '"enforcing_min_version":"29.5.0"}'))
+    check("end_time parsed", _timed[1]["end_time"], 1819756800)
+    check("end_time in next_policy", next_policy_block(_timed, 975000, [])["end_time"], 1819756800)
+    check("no end_time key when absent", "end_time" in next_policy_block(_timed, 970000, []), False)
+    expect_raises("string end_time", lambda: parse_policies(
+        '[{"id":"a","name":"a","short":"a","activation":973440,"end":979920,"end_time":"2027",'
+        '"enforcing_min_version":"29.4.2"}]'))
+    expect_raises("bool end_time", lambda: parse_policies(
+        '[{"id":"a","name":"a","short":"a","activation":973440,"end":979920,"end_time":true,'
+        '"enforcing_min_version":"29.4.2"}]'))
 
     print("\n%s" % ("ALL PASS" if not failed else "%d FAILED" % failed))
     return 1 if failed else 0
