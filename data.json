@@ -2,13 +2,13 @@
  "activation_end_height": 1050000,
  "activation_end_time": 1819756800,
  "activation_height": 979919,
- "b2b": 2618,
- "b2b_poll_age_max": 3126677,
- "b2b_poll_age_median": 1292,
- "b2b_poll_age_p90": 1694204,
- "b2b_polled_recently": 1750,
- "b2b_reachable": 1152,
- "dump_ts": 1793680033,
+ "b2b": 2619,
+ "b2b_poll_age_max": 3130279,
+ "b2b_poll_age_median": 1297,
+ "b2b_poll_age_p90": 1697806,
+ "b2b_polled_recently": 1747,
+ "b2b_reachable": 1155,
+ "dump_ts": 1793683640,
  "enforcing_versions": [
   "/Satoshi:29.4.3(BIP110 meow miao)/Knots:20260508/",
   "/Satoshi:29.4.3(BIP110)/Knots:20260508/",
@@ -33,21 +33,21 @@
  "heights": {
   "behind": 0,
   "day": 0,
-  "near": 12,
-  "tip": 1140
+  "near": 28,
+  "tip": 1127
  },
  "heights_by_enforcement": {
   "enforcing": {
    "behind": 0,
    "day": 0,
-   "near": 9,
-   "tip": 803
+   "near": 19,
+   "tip": 795
   },
   "not_enforcing": {
    "behind": 0,
    "day": 0,
-   "near": 3,
-   "tip": 337
+   "near": 9,
+   "tip": 332
   }
  },
  "heights_by_version": {
@@ -78,8 +78,8 @@
   "/Satoshi:29.4.1/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 0,
-   "tip": 31
+   "near": 1,
+   "tip": 30
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
    "behind": 0,
@@ -108,8 +108,8 @@
   "/Satoshi:29.4.2/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 3,
-   "tip": 254
+   "near": 8,
+   "tip": 250
   },
   "/Satoshi:29.4.2/Knots:20260508/Plumb:6/": {
    "behind": 0,
@@ -192,8 +192,8 @@
   "/Satoshi:29.4.3/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 9,
-   "tip": 747
+   "near": 18,
+   "tip": 740
   },
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:9/PyBLOCK Crew/": {
    "behind": 0,
@@ -222,8 +222,8 @@
   "/Satoshi:29.4.3/Knots:20260508/Plumb:9/": {
    "behind": 0,
    "day": 0,
-   "near": 0,
-   "tip": 14
+   "near": 1,
+   "tip": 13
   },
   "/Satoshi:29.4.3/Knots:20260508rc5/": {
    "behind": 0,
@@ -238,12 +238,12 @@
    "tip": 5
   }
  },
- "max_height": 980233,
+ "max_height": 980240,
  "networks": {
-  "i2p": 523,
+  "i2p": 524,
   "ipv4": 183,
   "ipv6": 36,
-  "tor": 410
+  "tor": 412
  },
  "next_policy": null,
  "policy": {
@@ -251,12 +251,12 @@
   "name": "180-day rolling coinbase maturity",
   "short": "180-day maturity"
  },
- "reachable": 1152,
- "storage_archival": 1227,
+ "reachable": 1155,
+ "storage_archival": 1233,
  "storage_other": 0,
- "storage_pruned": 523,
- "total": 200000,
- "ts": 1793680708,
+ "storage_pruned": 514,
+ "total": 199892,
+ "ts": 1793684310,
  "versions": {
   "/GrayersDad:10.27.2026=BLAKE2b/": 3,
   "/OracleKnots:29.4.3(Forever Money)/OracleKnots:20260508.plumb8/": 2,
@@ -264,10 +264,10 @@
   "/Satoshi:29.4.1/Knots:20260508/": 32,
   "/Satoshi:29.4.1/Knots:20260508rc4/": 32,
   "/Satoshi:29.4.1/Knots:20260508rc5/": 5,
-  "/Satoshi:29.4.2/Knots:20260508/": 260,
+  "/Satoshi:29.4.2/Knots:20260508/": 261,
   "/Satoshi:29.4.2/Knots:20260508/Plumb:6/": 1,
   "/Satoshi:29.4.2/Knots:20260508rc2/": 3,
-  "/Satoshi:29.4.3/Knots:20260508/": 778,
+  "/Satoshi:29.4.3/Knots:20260508/": 780,
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:9/PyBLOCK Crew/": 1,
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": 3,
   "/Satoshi:29.4.3/Knots:20260508/Plumb:7/": 2,
@@ -300,7 +300,7 @@
   "/Satoshi:29.4.1/Knots:20260508/": {
    "archival": 33,
    "other": 0,
-   "pruned": 21
+   "pruned": 20
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
    "archival": 32,
@@ -313,9 +313,9 @@
    "pruned": 0
   },
   "/Satoshi:29.4.2/Knots:20260508/": {
-   "archival": 270,
+   "archival": 271,
    "other": 0,
-   "pruned": 132
+   "pruned": 128
   },
   "/Satoshi:29.4.2/Knots:20260508/Plumb:6/": {
    "archival": 1,
@@ -328,9 +328,9 @@
    "pruned": 1
   },
   "/Satoshi:29.4.3/Knots:20260508/": {
-   "archival": 831,
+   "archival": 836,
    "other": 0,
-   "pruned": 359
+   "pruned": 355
   },
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:9/PyBLOCK Crew/": {
    "archival": 1,
