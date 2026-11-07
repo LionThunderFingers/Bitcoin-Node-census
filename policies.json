@@ -15,5 +15,14 @@
     "end": 1050000,
     "end_time": 1819756800,
     "enforcing_min_version": "29.4.3"
+  },
+  {
+    "id": "29.5.0",
+    "name": "Knots 29.5.0",
+    "short": "29.5.0",
+    "activation": 980000,
+    "end": 1050000,
+    "end_time": 1819756800,
+    "enforcing_min_version": "29.5.0"
   }
 ]
