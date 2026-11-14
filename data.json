@@ -2,13 +2,13 @@
  "activation_end_height": 1050000,
  "activation_end_time": 1819756800,
  "activation_height": 979919,
- "b2b": 2888,
- "b2b_poll_age_max": 4084882,
- "b2b_poll_age_median": 6511,
- "b2b_poll_age_p90": 2424177,
- "b2b_polled_recently": 1335,
- "b2b_reachable": 794,
- "dump_ts": 1794638685,
+ "b2b": 2889,
+ "b2b_poll_age_max": 4088483,
+ "b2b_poll_age_median": 8260,
+ "b2b_poll_age_p90": 2427778,
+ "b2b_polled_recently": 1410,
+ "b2b_reachable": 878,
+ "dump_ts": 1794642294,
  "enforcing_versions": [
   "/Satoshi:29.4.3(BIP110 meow miao)/Knots:20260508/",
   "/Satoshi:29.4.3(mempool.guide)/Knots:20260508/",
@@ -19,10 +19,10 @@
   "/Satoshi:29.4.3/Knots:20260508rc5/",
   "/Satoshi:29.5.0(BIP110)/Knots:20260508/",
   "/Satoshi:29.5.0(Bitcoin-is-money)/Knots:20260508/",
+  "/Satoshi:29.5.0(KUDUHODL-KNOTS)/Knots:20260508/",
   "/Satoshi:29.5.0(Kilombino)/Knots:20260508/",
   "/Satoshi:29.5.0(Nordrassil)/Knots:20260508/",
   "/Satoshi:29.5.0(Unhosted Node)/Knots:20260508/",
-  "/Satoshi:29.5.0(XBT-NGU)/Knots:20260508/",
   "/Satoshi:29.5.0(filteroor)/Knots:20260508/",
   "/Satoshi:29.5.0(hexalink.xyz)/Knots:20260508/",
   "/Satoshi:29.5.0/Knots:20260508/",
@@ -32,35 +32,35 @@
  ],
  "heights": {
   "behind": 0,
-  "day": 1,
-  "near": 673,
-  "tip": 120
+  "day": 29,
+  "near": 828,
+  "tip": 21
  },
  "heights_by_enforcement": {
   "enforcing": {
    "behind": 0,
-   "day": 1,
-   "near": 539,
-   "tip": 87
+   "day": 22,
+   "near": 656,
+   "tip": 16
   },
   "not_enforcing": {
    "behind": 0,
-   "day": 0,
-   "near": 134,
-   "tip": 33
+   "day": 7,
+   "near": 172,
+   "tip": 5
   }
  },
  "heights_by_version": {
   "/GrayersDad:10.27.2026=BLAKE2b/": {
    "behind": 0,
    "day": 0,
-   "near": 2,
+   "near": 3,
    "tip": 0
   },
   "/OracleKnots:29.5.0(Forever Money)/OracleKnots:20260508.plumb9/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
+   "near": 2,
    "tip": 0
   },
   "/OracleKnots:29.5.0/OracleKnots:20260508/": {
@@ -71,20 +71,20 @@
   },
   "/Satoshi:29.4.1/Knots:20260508/": {
    "behind": 0,
-   "day": 0,
-   "near": 18,
-   "tip": 5
+   "day": 1,
+   "near": 24,
+   "tip": 0
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
    "behind": 0,
-   "day": 0,
-   "near": 19,
-   "tip": 2
+   "day": 1,
+   "near": 21,
+   "tip": 1
   },
   "/Satoshi:29.4.1/Knots:20260508rc5/": {
    "behind": 0,
    "day": 0,
-   "near": 2,
+   "near": 3,
    "tip": 0
   },
   "/Satoshi:29.4.2(Undersector XBT)/Knots:20260508/": {
@@ -95,15 +95,15 @@
   },
   "/Satoshi:29.4.2/Knots:20260508/": {
    "behind": 0,
-   "day": 0,
-   "near": 90,
-   "tip": 24
+   "day": 5,
+   "near": 115,
+   "tip": 4
   },
   "/Satoshi:29.4.2/Knots:20260508rc2/": {
    "behind": 0,
    "day": 0,
-   "near": 0,
-   "tip": 2
+   "near": 2,
+   "tip": 0
   },
   "/Satoshi:29.4.3(BIP110 meow miao)/Knots:20260508/": {
    "behind": 0,
@@ -125,9 +125,9 @@
   },
   "/Satoshi:29.4.3/Knots:20260508/": {
    "behind": 0,
-   "day": 0,
-   "near": 205,
-   "tip": 28
+   "day": 8,
+   "near": 243,
+   "tip": 5
   },
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:9/PyBLOCK Crew/": {
    "behind": 0,
@@ -150,19 +150,25 @@
   "/Satoshi:29.5.0(BIP110)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 3,
-   "tip": 3
+   "near": 5,
+   "tip": 1
   },
   "/Satoshi:29.5.0(Bitcoin-is-money)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
+   "near": 1,
+   "tip": 0
+  },
+  "/Satoshi:29.5.0(KUDUHODL-KNOTS)/Knots:20260508/": {
+   "behind": 0,
+   "day": 1,
    "near": 0,
-   "tip": 1
+   "tip": 0
   },
   "/Satoshi:29.5.0(Kilombino)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
-   "near": 1,
+   "near": 2,
    "tip": 0
   },
   "/Satoshi:29.5.0(Nordrassil)/Knots:20260508/": {
@@ -172,12 +178,6 @@
    "tip": 0
   },
   "/Satoshi:29.5.0(Unhosted Node)/Knots:20260508/": {
-   "behind": 0,
-   "day": 0,
-   "near": 1,
-   "tip": 0
-  },
-  "/Satoshi:29.5.0(XBT-NGU)/Knots:20260508/": {
    "behind": 0,
    "day": 0,
    "near": 1,
@@ -197,19 +197,19 @@
   },
   "/Satoshi:29.5.0/Knots:20260508/": {
    "behind": 0,
-   "day": 1,
-   "near": 302,
-   "tip": 54
+   "day": 11,
+   "near": 376,
+   "tip": 10
   },
   "/Satoshi:29.5.0/Knots:20260508/PATUM:1.0.6(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": {
    "behind": 0,
    "day": 0,
-   "near": 2,
-   "tip": 1
+   "near": 4,
+   "tip": 0
   },
   "/Satoshi:29.5.0/Knots:20260508/Plumb:10/": {
    "behind": 0,
-   "day": 0,
+   "day": 2,
    "near": 10,
    "tip": 0
   },
@@ -220,12 +220,12 @@
    "tip": 0
   }
  },
- "max_height": 981907,
+ "max_height": 981915,
  "networks": {
-  "i2p": 559,
-  "ipv4": 169,
-  "ipv6": 33,
-  "tor": 33
+  "i2p": 556,
+  "ipv4": 167,
+  "ipv6": 31,
+  "tor": 124
  },
  "next_policy": null,
  "policy": {
@@ -233,28 +233,28 @@
   "name": "180-day rolling coinbase maturity",
   "short": "180-day maturity"
  },
- "reachable": 794,
- "storage_archival": 930,
+ "reachable": 878,
+ "storage_archival": 982,
  "storage_other": 0,
- "storage_pruned": 405,
- "total": 188796,
- "ts": 1794638913,
+ "storage_pruned": 428,
+ "total": 188881,
+ "ts": 1794642514,
  "versions": {
-  "/GrayersDad:10.27.2026=BLAKE2b/": 2,
-  "/OracleKnots:29.5.0(Forever Money)/OracleKnots:20260508.plumb9/": 1,
+  "/GrayersDad:10.27.2026=BLAKE2b/": 3,
+  "/OracleKnots:29.5.0(Forever Money)/OracleKnots:20260508.plumb9/": 2,
   "/OracleKnots:29.5.0/OracleKnots:20260508/": 1,
-  "/Satoshi:29.4.1/Knots:20260508/": 23,
-  "/Satoshi:29.4.1/Knots:20260508rc4/": 21,
-  "/Satoshi:29.4.1/Knots:20260508rc5/": 2,
-  "/Satoshi:29.4.2/Knots:20260508/": 115,
+  "/Satoshi:29.4.1/Knots:20260508/": 25,
+  "/Satoshi:29.4.1/Knots:20260508rc4/": 23,
+  "/Satoshi:29.4.1/Knots:20260508rc5/": 3,
+  "/Satoshi:29.4.2/Knots:20260508/": 125,
   "/Satoshi:29.4.2/Knots:20260508rc2/": 2,
-  "/Satoshi:29.4.3/Knots:20260508/": 237,
+  "/Satoshi:29.4.3/Knots:20260508/": 260,
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:9/PyBLOCK Crew/": 1,
   "/Satoshi:29.4.3/Knots:20260508/Plumb:9/": 3,
   "/Satoshi:29.4.3/Knots:20260508rc5/": 1,
-  "/Satoshi:29.5.0/Knots:20260508/": 370,
-  "/Satoshi:29.5.0/Knots:20260508/PATUM:1.0.6(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": 3,
-  "/Satoshi:29.5.0/Knots:20260508/Plumb:10/": 10,
+  "/Satoshi:29.5.0/Knots:20260508/": 411,
+  "/Satoshi:29.5.0/Knots:20260508/PATUM:1.0.6(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": 4,
+  "/Satoshi:29.5.0/Knots:20260508/Plumb:10/": 12,
   "/Satoshi:29.5.0/Knots:20260508rc2/": 2
  },
  "versions_storage": {
@@ -264,12 +264,12 @@
    "pruned": 2
   },
   "/GrayersDad:10.27.2026=BLAKE2b/": {
-   "archival": 3,
+   "archival": 4,
    "other": 0,
    "pruned": 0
   },
   "/OracleKnots:29.5.0(Forever Money)/OracleKnots:20260508.plumb9/": {
-   "archival": 1,
+   "archival": 2,
    "other": 0,
    "pruned": 0
   },
@@ -281,10 +281,10 @@
   "/Satoshi:29.4.1/Knots:20260508/": {
    "archival": 26,
    "other": 0,
-   "pruned": 15
+   "pruned": 16
   },
   "/Satoshi:29.4.1/Knots:20260508rc4/": {
-   "archival": 21,
+   "archival": 24,
    "other": 0,
    "pruned": 1
   },
@@ -296,7 +296,7 @@
   "/Satoshi:29.4.2/Knots:20260508/": {
    "archival": 133,
    "other": 0,
-   "pruned": 78
+   "pruned": 80
   },
   "/Satoshi:29.4.2/Knots:20260508rc2/": {
    "archival": 3,
@@ -304,9 +304,9 @@
    "pruned": 0
   },
   "/Satoshi:29.4.3/Knots:20260508/": {
-   "archival": 274,
+   "archival": 292,
    "other": 0,
-   "pruned": 163
+   "pruned": 168
   },
   "/Satoshi:29.4.3/Knots:20260508/PATUM:1.0.5(https://b.pyblock.xyz:8443)/Plumb:9/PyBLOCK Crew/": {
    "archival": 1,
@@ -324,9 +324,9 @@
    "pruned": 1
   },
   "/Satoshi:29.5.0/Knots:20260508/": {
-   "archival": 436,
+   "archival": 464,
    "other": 0,
-   "pruned": 141
+   "pruned": 154
   },
   "/Satoshi:29.5.0/Knots:20260508/PATUM:1.0.6(https://b.pyblock.xyz:8443)/PyBLOCK Crew/": {
    "archival": 4,
@@ -334,9 +334,9 @@
    "pruned": 0
   },
   "/Satoshi:29.5.0/Knots:20260508/Plumb:10/": {
-   "archival": 16,
+   "archival": 17,
    "other": 0,
-   "pruned": 3
+   "pruned": 5
   },
   "/Satoshi:29.5.0/Knots:20260508rc2/": {
    "archival": 2,
