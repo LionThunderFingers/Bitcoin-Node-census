@@ -747,6 +747,9 @@ const VP_LABEL_SHARE = 3;        // no on-slice label under this %
 // colour as shares move. Consecutive releases (29.4.3 -> 29.5.0 -> 29.5.1) step through the
 // four slots in cycle order, and every cyclic neighbour in this order was validated, as was
 // each slot against the release-candidate colour that follows the oldest release.
+// Plumb, Older Knots and Other are three neutrals of different lightness, not hues: no
+// fork gets an alarm colour, and the neutrals separate the variable Knots boundary from
+// the fixed tail (every non-red hue for Plumb failed a CVD or normal-vision gate).
 const VP_POOL = ["var(--vp-1)", "var(--vp-2)", "var(--vp-3)", "var(--vp-4)"];
 const VP_FIXED = { older: "var(--vp-older)", rc: "var(--vp-rc)",
                    plumb: "var(--vp-plumb)", other: "var(--vp-other)" };
@@ -823,6 +826,10 @@ const svgEl = (tag, attrs) => {
   return e;
 };
 const vpPctLabel = g => g.pct === 0 ? "<1%" : g.pct + "%";
+// Drill-down shares: one decimal on every row so rows compare at the same precision; a
+// nonzero share that would print as 0.0 says "<0.1%" instead of claiming zero.
+const vpPct1 = p => p === null ? DASH
+  : p > 0 && p < 0.05 ? "<0.1%" : p.toFixed(1) + "%";
 
 function renderVersionPie() {
   const sec = $("versionPieSection");
@@ -917,7 +924,7 @@ function renderVersionPie() {
         el("td", by === "User agent" ? { class: "ua" } : null,
           name === "" ? "(no user agent)" : name),
         el("td", { class: "n" }, fmt(c)),
-        el("td", { class: "n" }, pctStr(pctOf(c, basis.total)))))))));
+        el("td", { class: "n" }, vpPct1(pctOf(c, basis.total)))))))));
 }
 
 function vpToggle(key) {
