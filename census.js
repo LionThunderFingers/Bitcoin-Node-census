@@ -87,6 +87,10 @@ function showBanner(head, msg) {
 }
 function showError(msg) {
   showBanner("Could not load the latest figures.", msg);
+  // The share pie reserves its space before data.json lands; with no sample it has nothing
+  // to show, so drop the empty card rather than leave a blank box.
+  const vp = document.getElementById("versionPieSection");
+  if (vp) vp.hidden = true;
 }
 
 // How old data.json has to be before the page says so, measured against the viewer's own
@@ -142,6 +146,7 @@ function render(d) {
   document.getElementById("figTip").textContent = fmtOr(d.max_height);
 
   renderSoftware();
+  renderVersionPie();
   renderActivation();
   renderHeights(d);
   renderNetworks(d);
@@ -726,6 +731,202 @@ function renderSoftware() {
     ? "Showing the " + fmt(shown.length) + " of " + fmt(gone.length) + " with the highest peak. "
     : "") + "Seen by this crawler at some point, but not in the current sample. Full " +
     "machine-readable list: releases.json.";
+}
+
+// ---- Software share: a pie over the same basis as the software table ----
+// Every user agent lands in exactly one slice, so the slices sum to the table's totals row.
+// Classification order matters: Plumb first (an OracleKnots or PATUM build carrying a Plumb
+// token is a Plumb node), then release candidates, then anything that is not an official
+// Knots build, and only then Knots by its Satoshi:X.Y.Z base. User agents are
+// attacker-controlled; everything below reaches the DOM as text nodes or setAttribute
+// values, never as markup.
+const VP_MIN_SHARE = 2;          // a Knots release under this % of the basis folds into one slice
+const VP_MAX_RELEASES = 4;       // and at most this many Knots releases get their own slice
+const VP_LABEL_SHARE = 3;        // no on-slice label under this %
+// Knots release colours are picked by patch number, not by rank, so a release keeps its
+// colour as shares move. Consecutive releases (29.4.3 -> 29.5.0 -> 29.5.1) step through the
+// four slots in cycle order, and every cyclic neighbour in this order was validated, as was
+// each slot against the release-candidate colour that follows the oldest release.
+const VP_POOL = ["var(--vp-1)", "var(--vp-2)", "var(--vp-3)", "var(--vp-4)"];
+const VP_FIXED = { older: "var(--vp-older)", rc: "var(--vp-rc)",
+                   plumb: "var(--vp-plumb)", other: "var(--vp-other)" };
+const VP_SAT = /\/Satoshi:(\d+)\.(\d+)(?:\.(\d+))?(?=[(\/])/;
+let VP_OPEN = null;              // key of the slice whose breakdown is open
+
+function vpClassify(ua) {
+  if (/plumb/i.test(ua)) {
+    const m = /plumb:?(\d+)/i.exec(ua);
+    return { key: "plumb", sub: m ? "Plumb " + Number(m[1]) : "Plumb (no version number)" };
+  }
+  if (/rc\d/i.test(ua)) return { key: "rc", sub: ua };
+  if (/oracle/i.test(ua) || !/Knots/i.test(ua)) return { key: "other", sub: ua };
+  const m = VP_SAT.exec(ua);
+  if (!m) return { key: "other", sub: ua };   // says Knots but carries no Satoshi base version
+  const ver = [Number(m[1]), Number(m[2]), Number(m[3] || 0)];
+  return { key: "knots:" + ver.join("."), ver, sub: ua };
+}
+const vpCmpVer = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+function vpSlices(basis) {
+  const groups = new Map();
+  const add = (key, init, sub, n) => {
+    let g = groups.get(key);
+    if (!g) { g = Object.assign({ key, total: 0, members: new Map() }, init); groups.set(key, g); }
+    g.total += n;
+    g.members.set(sub, (g.members.get(sub) || 0) + n);
+  };
+  for (const r of basis.rows) {
+    if (!(r.total > 0)) continue;
+    const c = vpClassify(r.ua);
+    add(c.key, c.ver ? { kind: "knots", ver: c.ver, name: "Knots " + c.ver.join(".") }
+                     : { kind: c.key }, c.sub, r.total);
+  }
+  const knots = [...groups.values()].filter(g => g.kind === "knots");
+  const big = knots.filter(g => g.total / basis.total * 100 >= VP_MIN_SHARE)
+    .sort((a, b) => b.total - a.total || vpCmpVer(b.ver, a.ver)).slice(0, VP_MAX_RELEASES);
+  const small = knots.filter(g => !big.includes(g));
+  big.sort((a, b) => vpCmpVer(b.ver, a.ver));            // newest first
+
+  // Colours, oldest first so an incumbent keeps its slot and a newcomer that collides moves.
+  const used = new Set();
+  for (const g of big.slice().reverse()) {
+    let s = g.ver[2] % VP_POOL.length;
+    while (used.has(s)) s = (s + 1) % VP_POOL.length;
+    used.add(s); g.color = VP_POOL[s];
+  }
+  const out = big.slice();
+  if (small.length) {
+    // "Older" only when it is true: a new release still under the threshold must not be
+    // filed under a name that says it is old.
+    const oldest = big.length ? big[big.length - 1].ver : null;
+    const allOlder = oldest && small.every(g => vpCmpVer(g.ver, oldest) < 0);
+    const members = new Map();
+    for (const g of small) members.set(g.name, g.total);
+    out.push({ key: "older", kind: "older", color: VP_FIXED.older, members,
+               name: allOlder ? "Older Knots" : "Other Knots releases",
+               total: small.reduce((s, g) => s + g.total, 0) });
+  }
+  const NAMES = { rc: "Release candidates", plumb: "Plumb", other: "Other" };
+  for (const k of ["rc", "plumb", "other"]) {
+    const g = groups.get(k);
+    if (g) out.push(Object.assign(g, { name: NAMES[k], color: VP_FIXED[k] }));
+  }
+  const pct = largestRemainder(out.map(g => g.total / basis.total * 100));
+  out.forEach((g, i) => { g.share = g.total / basis.total * 100; g.pct = pct[i]; });
+  return out;
+}
+
+const SVGNS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, attrs) => {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  return e;
+};
+const vpPctLabel = g => g.pct === 0 ? "<1%" : g.pct + "%";
+
+function renderVersionPie() {
+  const sec = $("versionPieSection");
+  if (!sec) return;
+  const basis = DATA ? softwareBasis(DATA) : null;
+  if (!basis) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const slices = vpSlices(basis);
+  if (VP_OPEN && !slices.some(g => g.key === VP_OPEN)) VP_OPEN = null;
+
+  $("vpCap").textContent = "Share of the " + fmt(basis.total) + " " + basis.label +
+    ", the same count as the table below. Select a slice to list what is in it.";
+
+  // ---- the pie ----
+  const R = 118, LR = R * 0.66, POP = 7;
+  const n1 = v => Math.round(v * 100) / 100;
+  const svg = svgEl("svg", { viewBox: "-130 -130 260 260", role: "img",
+    "aria-label": "Pie chart of " + fmt(basis.total) + " nodes by software: " +
+      slices.map(g => g.name + " " + fmt(g.total) + " (" + vpPctLabel(g) + ")").join(", ") + "." });
+  const gSlices = svgEl("g"), gLabels = svgEl("g", { "aria-hidden": "true" });
+  let a0 = -Math.PI / 2;
+  for (const g of slices) {
+    const sweep = g.total / basis.total * 2 * Math.PI;
+    const a1 = a0 + sweep, mid = a0 + sweep / 2;
+    let shape;
+    if (slices.length === 1) {
+      shape = svgEl("circle", { cx: 0, cy: 0, r: R });
+    } else {
+      const x0 = n1(R * Math.cos(a0)), y0 = n1(R * Math.sin(a0));
+      const x1 = n1(R * Math.cos(a1)), y1 = n1(R * Math.sin(a1));
+      shape = svgEl("path", { d: "M0 0L" + x0 + " " + y0 + "A" + R + " " + R + " 0 " +
+        (sweep > Math.PI ? 1 : 0) + " 1 " + x1 + " " + y1 + "Z" });
+    }
+    shape.setAttribute("class", "vp-slice");
+    shape.setAttribute("style", "fill:" + g.color);
+    shape.dataset.key = g.key;
+    if (g.key === VP_OPEN) {
+      shape.classList.add("sel");
+      shape.setAttribute("transform", "translate(" + n1(POP * Math.cos(mid)) + " " +
+        n1(POP * Math.sin(mid)) + ")");
+    }
+    const t = svgEl("title");
+    t.textContent = g.name + ": " + fmt(g.total) + " nodes (" + vpPctLabel(g) + ")";
+    shape.append(t);
+    shape.addEventListener("click", () => vpToggle(g.key));
+    gSlices.append(shape);
+    if (g.share >= VP_LABEL_SHARE) {
+      const off = g.key === VP_OPEN ? POP : 0;
+      const lbl = svgEl("text", { class: "vp-lbl", x: n1((LR + off) * Math.cos(mid)),
+        y: n1((LR + off) * Math.sin(mid)), "text-anchor": "middle", "dominant-baseline": "central" });
+      lbl.textContent = vpPctLabel(g);
+      gLabels.append(lbl);
+    }
+    a0 = a1;
+  }
+  svg.append(gSlices, gLabels);
+  const host = $("vpHost");
+  host.classList.toggle("has-sel", VP_OPEN !== null);
+  host.replaceChildren(svg);
+
+  // ---- legend: one button per slice ----
+  $("vpLegend").replaceChildren(...slices.map(g => {
+    const b = el("button", { type: "button", class: "vp-leg", "aria-controls": "vpDrill",
+        "aria-expanded": g.key === VP_OPEN ? "true" : "false" },
+      el("span", { class: "vp-sw", style: "background:" + g.color, "aria-hidden": "true" }),
+      el("span", { class: "vp-name" }, g.name),
+      el("span", { class: "vp-n" }, fmt(g.total)),
+      el("span", { class: "vp-p" }, vpPctLabel(g)));
+    b.addEventListener("click", () => vpToggle(g.key));
+    return b;
+  }));
+
+  // ---- drill-down for the open slice ----
+  const drill = $("vpDrill");
+  const open = slices.find(g => g.key === VP_OPEN);
+  if (!open) { drill.hidden = true; drill.replaceChildren(); return; }
+  const by = open.kind === "plumb" ? "Plumb version"
+           : open.kind === "older" ? "Release" : "User agent";
+  const rows = [...open.members.entries()].sort((a, b) => b[1] - a[1] ||
+    (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  drill.hidden = false;
+  drill.replaceChildren(
+    el("h3", null, open.name + ": " + fmt(open.total) +
+      (open.total === 1 ? " node" : " nodes") + ", by " +
+      (open.kind === "plumb" ? "Plumb version" : by.toLowerCase())),
+    el("div", { class: "scroll" }, el("table", null,
+      el("thead", null, el("tr", null,
+        el("th", { scope: "col" }, by),
+        el("th", { scope: "col", style: "text-align:right" }, "Nodes"),
+        el("th", { scope: "col", style: "text-align:right" }, "Share of all"))),
+      el("tbody", null, ...rows.map(([name, c]) => el("tr", null,
+        el("td", by === "User agent" ? { class: "ua" } : null,
+          name === "" ? "(no user agent)" : name),
+        el("td", { class: "n" }, fmt(c)),
+        el("td", { class: "n" }, pctStr(pctOf(c, basis.total)))))))));
+}
+
+function vpToggle(key) {
+  VP_OPEN = VP_OPEN === key ? null : key;
+  // Re-render, then put focus back on the same legend button so a keyboard user does not
+  // lose their place when the legend is rebuilt.
+  const idx = [...$("vpLegend").children].findIndex(b => b === document.activeElement);
+  renderVersionPie();
+  if (idx >= 0 && $("vpLegend").children[idx]) $("vpLegend").children[idx].focus();
 }
 
 function renderStable(s) {
