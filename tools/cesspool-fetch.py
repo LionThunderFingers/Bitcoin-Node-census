@@ -30,6 +30,8 @@ SPACING = 2.5
 FULL_REFRESH_SECS = 24 * 3600
 USER_AGENT = "BitcoinNodeCensus/1 (+https://github.com/LionThunderFingers/Bitcoin-Node-census)"
 DEFAULT_CACHE = "/var/lib/census-cesspool"
+MAX_INVALID_FRAC = 0.10   # more invalid blocks than this in a non-empty batch = schema drift
+MIN_BLOCK_TIME = 1231006505  # genesis block
 KEYS = ("height", "hash", "time", "sewage_share", "weight")
 
 _HASH = re.compile(r"[0-9a-f]{64}")
@@ -40,8 +42,11 @@ def _is_int(v):
     return isinstance(v, int) and not isinstance(v, bool)
 
 
-def validate_block(obj, lo, hi):
-    """The five kept fields of a block, or None if anything is off. Extra keys are dropped."""
+def validate_block(obj, lo, hi, now=None):
+    """The five kept fields of a block, or None if anything is off. Extra keys are dropped.
+    `time` must lie in [genesis, now + 2 h]."""
+    if now is None:
+        now = time.time()
     if not isinstance(obj, dict):
         return None
     h, hsh, t = obj.get("height"), obj.get("hash"), obj.get("time")
@@ -50,7 +55,7 @@ def validate_block(obj, lo, hi):
         return None
     if not isinstance(hsh, str) or not _HASH.fullmatch(hsh):
         return None
-    if not _is_int(t) or t <= 0:
+    if not _is_int(t) or not (MIN_BLOCK_TIME <= t <= now + 7200):
         return None
     if isinstance(share, bool) or not isinstance(share, (int, float)):
         return None
@@ -84,10 +89,20 @@ def parse_batch(raw_bytes, n):
     if len(d["blocks"]) > 1000:
         raise ValueError("too many blocks")
     out = {}
+    bad = 0
     for b in d["blocks"]:
         v = validate_block(b, f, t)
         if v is not None:
             out[v["height"]] = v
+        else:
+            bad += 1
+    total = len(d["blocks"])
+    if bad:
+        print("cesspool-fetch: batch %d: dropped %d of %d blocks" % (n, bad, total), file=sys.stderr)
+    # One bad block is dropped; mostly-bad means cesspool changed its schema: fail the run.
+    if total and bad > total * MAX_INVALID_FRAC:
+        raise ValueError("batch %d: %d of %d blocks failed validation (schema change?)"
+                         % (n, bad, total))
     return [out[k] for k in sorted(out)]
 
 
@@ -175,11 +190,20 @@ def _run(cache_dir, opener, now, sleep):
     return 0
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect so no request ever leaves BASE."""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError("refusing redirect (%s) to %s" % (code, newurl[:200]))
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _urlopen(url):
     if not url.startswith(BASE):
         raise ValueError("refusing URL outside " + BASE)
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+    with _OPENER.open(req, timeout=TIMEOUT) as resp:
         data = resp.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise ValueError("response too large")
@@ -346,9 +370,80 @@ def _run_self_test():
             check("batch rollover rereads partial predecessor",
                   rc == 0 and log[1:] == [BASE + "blocks/963.json", BASE + "blocks/964.json"])
 
+    def test_schema_drift_fails_run():
+        with tempfile.TemporaryDirectory() as d:
+            rc, _, _, full = seeded(d)
+            check("seed run ok (drift)", rc == 0)
+            before = snap(d)
+            t = dict(full)
+            renamed = json.loads(batch(963, hi=963500))
+            for b in renamed["blocks"]:
+                b["sewage"] = b.pop("sewage_share")
+            t[BASE + "blocks/963.json"] = json.dumps(renamed).encode()
+            rc = run(d, make_opener(t, []), 1000 + 3600, lambda s: None)
+            check("renamed field -> run 1, cache byte-identical", rc == 1 and snap(d) == before)
+            t = dict(full)
+            t[BASE + "tip.json"] = tip(963500, "v2")
+            for n in (961, 962, 963):
+                r = json.loads(batch(n, hi=963500 if n == 963 else None))
+                for b in r["blocks"]:
+                    b["sewage"] = b.pop("sewage_share")
+                t["%sblocks/%d.json" % (BASE, n)] = json.dumps(r).encode()
+            rc = run(d, make_opener(t, []), 1000 + 7200, lambda s: None)
+            check("full refresh with every batch renamed -> 1, identical", rc == 1 and snap(d) == before)
+            ok = json.loads(batch(963, hi=963500))
+            ok["blocks"].append(blk(963100, sewage_share="x"))   # 1 of 3 bad is >10%
+            check("1/3 invalid -> rejected",
+                  _raises(lambda: parse_batch(json.dumps(ok).encode(), 963)))
+            many = {"from": 963000, "to": 963999, "blocks": [blk(963000 + i) for i in range(20)]}
+            many["blocks"][0]["weight"] = 0                      # 1 of 20 bad = 5%: kept
+            check("5% invalid -> rest kept", len(parse_batch(json.dumps(many).encode(), 963)) == 19)
+            check("empty list still fine",
+                  parse_batch(json.dumps({"from": 963000, "to": 963000, "blocks": []}).encode(), 963) == [])
+            fut = blk(1500, time=int(time.time()) + 10 * 3600)
+            check("far-future time rejected", validate_block(fut, 1000, 1999) is None)
+            check("pre-genesis time rejected", validate_block(blk(1500, time=5), 1000, 1999) is None)
+
+    def _raises(fn):
+        try:
+            fn()
+        except ValueError:
+            return True
+        return False
+
+    def test_no_redirects():
+        h = _NoRedirect()
+        check("redirect handler raises",
+              _raises(lambda: h.redirect_request(urllib.request.Request(BASE + "tip.json"),
+                                                 None, 302, "Found", {}, "http://evil.example/x")))
+        import http.server
+        import threading
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(302)
+                self.send_header("Location", "http://127.0.0.1:1/never")
+                self.end_headers()
+
+            def log_message(self, *a):
+                pass
+        srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            try:
+                _OPENER.open("http://127.0.0.1:%d/x" % srv.server_port, timeout=5)
+                got = False
+            except ValueError:
+                got = True
+            except Exception:
+                got = False
+            check("opener refuses a real 302", got)
+        finally:
+            srv.shutdown()
+
     for t in (test_block_validation, test_only_numeric_fields_cached, test_bad_responses_leave_cache,
               test_hourly_run_two_requests, test_regrade_refetches_all, test_daily_refresh,
-              test_new_batch_rereads_previous):
+              test_new_batch_rereads_previous, test_schema_drift_fails_run, test_no_redirects):
         try:
             t()
         except Exception as e:

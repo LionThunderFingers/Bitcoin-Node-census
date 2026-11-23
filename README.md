@@ -154,7 +154,7 @@ Samples whose `versions` counts do not sum to `b2b_reachable` are skipped (`tool
 
 Two separate measurements on one time axis, for the "Block spam grades and filtering nodes" chart on the page. Built hourly by `tools/gen_spam_share.py`. The file may be absent or stale if the block-data fetch failed; the previous copy is kept in that case.
 
-**Credit and licence.** The block figures (`blocks`, `last24h`, `latest_block`, `grader_version`) are derived from [cesspool.lol](https://cesspool.lol/), an MIT-licensed project; credit it if you use them. They are not part of this repository's CC BY 4.0 data claim, which covers only what this census measures itself (the `nodes` series). Per-block pages are at `https://cesspool.lol/block/<height>/`.
+**Credit and licence.** The block figures (`blocks`, `last24h`, `latest_block`, `grader_version`) come from [cesspool.lol](https://cesspool.lol/), whose code is MIT-licensed ([github.com/jasonsopko/cesspool](https://github.com/jasonsopko/cesspool)) and whose site asks for credit with a link; credit it if you use them. The block grades are not covered by this repository's CC BY 4.0 data claim, which covers only what this census measures itself (the `nodes` series). Per-block pages are at `https://cesspool.lol/block/<height>/`.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -164,7 +164,7 @@ Two separate measurements on one time axis, for the "Block spam grades and filte
 | `latest_block` | object or null | `{height, time}` of the newest graded block. |
 | `last24h` | object or null | `{blocks, share}`: rolling last 24 hours, `share` 0..1. Separate from `blocks`, which holds complete UTC days only. |
 | `blocks` | array | One object per complete UTC day, oldest first: `{day, blocks, share}`. `day` is the UTC day number (unix time / 86400), `blocks` the number of graded blocks that day (not a fixed ~144; early days after the difficulty change have several hundred), `share` the sewage share of block weight, 0..1, weighted by block weight (`sum(sewage_share * weight) / sum(weight)`). Empty when no block data is cached. |
-| `nodes` | array | One object per census sample, oldest first: `{ts, rated_good, plumb, knots_filter, share}`. `rated_good` is the rated-good node count (same basis as `policy-history.json`), `plumb` those whose user agent contains "plumb" (case-insensitive), `knots_filter` official Knots at or above `filter_min_knots` (not counted twice), and `share` = `(plumb + knots_filter) / rated_good`, 0..1. Samples whose `versions` counts do not sum to the rated-good total are skipped. |
+| `nodes` | array | One object per UTC day (that day's last valid census sample), oldest first: `{ts, rated_good, plumb, knots_filter, share}`. `rated_good` is the rated-good node count (same basis as `policy-history.json`), `plumb` those whose user agent contains "plumb" (case-insensitive), `knots_filter` official Knots at or above `filter_min_knots` (not counted twice), and `share` = `(plumb + knots_filter) / rated_good`, 0..1. Samples whose `versions` counts do not sum to the rated-good total are skipped. |
 
 The two series are not linked: nodes that relay with filters do not decide what miners put in blocks, so this file says nothing about cause and effect. Treat every value as untrusted input when consuming it.
 

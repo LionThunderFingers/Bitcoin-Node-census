@@ -1193,7 +1193,9 @@ function renderSpamShare(d) {
   const lb = obj(d.latest_block) ? d.latest_block : null;
   const height = lb ? numOr(lb.height, null) : null;
   const l24 = obj(d.last24h) ? frac(d.last24h.share) : null;
+  const btime = lb ? numOr(lb.time, null) : null;
   SPAM_SERIES = { blocks, nodes, grader: gv, last24: l24,
+    btime: btime !== null && btime > 0 ? btime : null,
     height: height !== null && height > 0 ? Math.floor(height) : null };
   sec.hidden = false;
   drawSpamChart();
@@ -1271,10 +1273,21 @@ function drawSpamChart() {
       el("a", { href: "https://cesspool.lol/block/" + Number(SPAM_SERIES.height) + "/", rel: "noopener" },
         "#" + fmt(SPAM_SERIES.height)));
   }
-  $("ssNow").replaceChildren(
-    "Last 24 h: " + (SPAM_SERIES.last24 !== null ? pc1(SPAM_SERIES.last24) : "block data unavailable") +
-    " of block weight graded sewage · " + pc1(lastN.share) + " of rated-good nodes run filtering software",
-    src);
+  // The 24 h figure is "24 h before the newest cached block", so it is only "last 24 h" while that
+  // block is recent. Older than 6 h: say when the block data was last updated instead. Not shown at
+  // all when the chart has too few block days or the newest block time is unknown.
+  const nodePart = pc1(lastN.share) + " of rated-good nodes run filtering software";
+  const bt = SPAM_SERIES.btime;
+  let head;
+  if (SPAM_SERIES.last24 === null || !haveBlocks || bt === null) {
+    head = "Last 24 h: block data unavailable · " + nodePart;
+  } else if (Date.now() / 1000 - bt > 6 * 3600) {
+    head = "Block data last updated " + new Date(bt * 1000).toISOString().slice(0, 16).replace("T", " ") +
+      " UTC (24 h to then: " + pc1(SPAM_SERIES.last24) + " of block weight graded sewage) · " + nodePart;
+  } else {
+    head = "Last 24 h: " + pc1(SPAM_SERIES.last24) + " of block weight graded sewage · " + nodePart;
+  }
+  $("ssNow").replaceChildren(head, src);
 
   $("ssCap").textContent = "Two separate measurements. Block grades are by cesspool.lol, using Plumb's " +
     "policy code (grader " + (SPAM_SERIES.grader || "unknown") + "). Node shares are from this " +

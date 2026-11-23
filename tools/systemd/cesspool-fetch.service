@@ -8,6 +8,8 @@ Type=oneshot
 User=census-fetch
 StateDirectory=census-cesspool
 ExecStart=/usr/bin/python3 -I /usr/local/bin/cesspool-fetch
+# RuntimeMaxSec is ignored for Type=oneshot; this is the real cap (a stalled server cannot hang it).
+TimeoutStartSec=10min
 StandardOutput=null
 # Unprivileged: no deploy key, no site clone; writes only its own cache.
 NoNewPrivileges=yes
@@ -17,3 +19,23 @@ ProtectHome=yes
 PrivateTmp=yes
 RestrictSUIDSGID=true
 LockPersonality=true
+# The site clone, the seeder data and the publish config are unreadable to the fetcher.
+InaccessiblePaths=/var/lib/census-site /var/lib/dnsseed /var/lib/lionseed -/etc/default/seed-publish
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+# AF_UNIX kept for name resolution (resolved/nscd).
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+MemoryMax=256M
+# seed-publish (root) must be able to read the cache.
+UMask=0022

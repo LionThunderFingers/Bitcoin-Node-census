@@ -2,7 +2,7 @@
 Description=Fetch cesspool.lol block grades hourly
 
 [Timer]
-# Lands before seed-publish (OnBootSec=10min) so it publishes fresh grades.
+# Not ordered against seed-publish (RandomizedDelaySec drifts it); worst case the panel is one hour staler.
 OnBootSec=8min
 OnUnitActiveSec=1h
 RandomizedDelaySec=2min

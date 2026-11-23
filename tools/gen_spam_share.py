@@ -20,6 +20,7 @@ import json
 import math
 import os
 import re
+import stat
 import sys
 
 try:
@@ -61,10 +62,26 @@ def _valid_block(obj, lo, hi):
     return {"height": h, "hash": hsh, "time": t, "sewage_share": float(share), "weight": w}
 
 
+_MAX_FILES = 5000
+
+
 def _read_json(path):
+    """Read a cache file only if it is a regular file: no symlinks (the directory is writable by
+    another user and this runs as root), no FIFOs or devices (they could block the read)."""
     try:
-        with open(path, "rb") as f:
-            raw = f.read(_MAX_BYTES + 1)
+        if not stat.S_ISREG(os.lstat(path).st_mode):
+            return None
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        fd = os.open(path, flags)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                return None
+            with os.fdopen(fd, "rb") as f:
+                fd = -1
+                raw = f.read(_MAX_BYTES + 1)
+        finally:
+            if fd >= 0:
+                os.close(fd)
         if len(raw) > _MAX_BYTES:
             return None
         return json.loads(raw.decode("utf-8"))
@@ -80,7 +97,7 @@ def load_cache(cache_dir):
     except OSError:
         return [], None
     best = {}  # height -> (fetched, batch n, block)
-    for name in names:
+    for name in sorted(names)[:_MAX_FILES]:
         m = _BATCH_NAME.fullmatch(name)
         if not m:
             continue
@@ -319,7 +336,49 @@ def _run_self_test():
         finally:
             shutil.rmtree(d)
 
-    for t in (test_weighted_share, test_partial_day_excluded, test_node_series_classification,
+    def test_unsafe_files_skipped():
+        d = tempfile.mkdtemp()
+        o = tempfile.mkdtemp()
+        try:
+            write_batch(o, 1, [blk(1000, D0 + 1, 0.5, 10)])
+            real = os.path.join(o, "1.json")
+            made = False
+            try:
+                os.symlink(real, os.path.join(d, "1.json"))
+                made = True
+            except (OSError, NotImplementedError, AttributeError):
+                print("skip  symlink test (cannot create symlinks here)")
+            if made:
+                check("symlinked batch ignored", load_cache(d)[0], [])
+            if hasattr(os, "mkfifo"):
+                os.mkfifo(os.path.join(d, "2.json"))
+                check("FIFO batch skipped, no hang", load_cache(d)[0], [])
+            else:
+                print("skip  FIFO test (no mkfifo on this platform)")
+            write_batch(d, 3, [blk(3000, D0 + 2, 0.5, 10)])
+            check("regular file still read", [b["height"] for b in load_cache(d)[0]], [3000])
+        finally:
+            shutil.rmtree(d)
+            shutil.rmtree(o)
+
+    def test_corrupt_cache_exit():
+        d = tempfile.mkdtemp()
+        try:
+            write_state(d, "v1")
+            with open(os.path.join(d, "961.json"), "w") as f:
+                f.write("{not json")
+            cen = os.path.join(d, "census.jsonl")
+            open(cen, "w").close()
+            check("state ok but no blocks -> exit 1", main(["x", d, cen]), 1)
+            d2 = tempfile.mkdtemp()
+            try:
+                check("no cache at all -> exit 0", main(["x", d2, cen]), 0)
+            finally:
+                shutil.rmtree(d2)
+        finally:
+            shutil.rmtree(d)
+
+    for t in (test_unsafe_files_skipped, test_corrupt_cache_exit, test_weighted_share, test_partial_day_excluded, test_node_series_classification,
               test_no_cache, test_grader_version_rejected, test_cache_dedupe_and_junk):
         t()
     print("\n%s" % ("ALL PASS" if not failed else "%d FAILED" % failed))
@@ -338,7 +397,12 @@ def main(argv):
     except (OSError, UnicodeDecodeError) as e:
         print("gen_spam_share: cannot read census: %s" % e, file=sys.stderr)
         return 1
-    print(json.dumps(build(argv[1], lines), separators=(",", ":")))
+    out = build(argv[1], lines)
+    if out["grader_version"] is not None and out["latest_block"] is None:
+        # a valid state.json but not one readable block: a corrupt cache, not a fresh install
+        print("gen_spam_share: cache has state.json but no readable blocks", file=sys.stderr)
+        return 1
+    print(json.dumps(out, separators=(",", ":")))
     return 0
 
 

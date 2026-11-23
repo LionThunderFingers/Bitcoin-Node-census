@@ -16,8 +16,8 @@ clone of this repo, so a push here cannot change what runs on the host.
   (`/api/v1/tip.json`, `/api/v1/blocks/<n>.json`) into `/var/lib/census-cesspool/`. It runs as
   system user `census-fetch`, which cannot read the deploy key, `/etc/default/seed-publish` or the
   site clone. Per block it keeps only `height`, `hash`, `time`, `sewage_share`, `weight`, each
-  validated; no text from cesspool is cached. Hourly = 2 requests; a full re-read happens when
-  `grader_version` changes and every 24 h, at 2.5 s spacing, all-or-nothing. On any failure it
+  validated; no text from cesspool is cached except `grader_version`, pattern-checked. Hourly = 2 requests; a full re-read happens when
+  `grader_version` changes and every 24 h, at 2.5 s spacing, all downloads finish before any file is written. On any failure it
   exits 1 and leaves the cache untouched, and `seed-publish` just keeps the previous output.
   `cesspool-fetch --self-test` runs its checks (no network).
 - `seed-stable.py` lists consistently reachable nodes (`stable-nodes.json`).
@@ -61,5 +61,8 @@ The cesspool fetcher is installed separately:
 useradd --system --no-create-home --shell /usr/sbin/nologin census-fetch
 install -m 0755 tools/cesspool-fetch.py /usr/local/bin/cesspool-fetch
 cp tools/systemd/cesspool-fetch.{service,timer} /etc/systemd/system/
-systemctl daemon-reload && systemctl enable --now cesspool-fetch.timer
+systemctl daemon-reload && systemctl start cesspool-fetch   # once, then check `journalctl -u cesspool-fetch` and /var/lib/census-cesspool
+systemctl enable --now cesspool-fetch.timer
 ```
+
+Run the fetcher once and check its output before installing the new `seed-publish`; otherwise the first publish commits `blocks: []` to the public file.
