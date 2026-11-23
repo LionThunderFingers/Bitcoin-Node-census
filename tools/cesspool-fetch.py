@@ -32,8 +32,8 @@ USER_AGENT = "BitcoinNodeCensus/1 (+https://github.com/LionThunderFingers/Bitcoi
 DEFAULT_CACHE = "/var/lib/census-cesspool"
 KEYS = ("height", "hash", "time", "sewage_share", "weight")
 
-_HASH = re.compile(r"^[0-9a-f]{64}$")
-_VERSION = re.compile(r"^[A-Za-z0-9.+_-]{1,64}$")
+_HASH = re.compile(r"[0-9a-f]{64}")
+_VERSION = re.compile(r"[A-Za-z0-9.+_-]{1,64}")
 
 
 def _is_int(v):
@@ -48,7 +48,7 @@ def validate_block(obj, lo, hi):
     share, w = obj.get("sewage_share"), obj.get("weight")
     if not _is_int(h) or not (lo <= h <= hi):
         return None
-    if not isinstance(hsh, str) or not _HASH.match(hsh):
+    if not isinstance(hsh, str) or not _HASH.fullmatch(hsh):
         return None
     if not _is_int(t) or t <= 0:
         return None
@@ -98,7 +98,7 @@ def parse_tip(raw_bytes):
     h, gv = d.get("height"), d.get("grader_version")
     if not _is_int(h) or h < 0:
         raise ValueError("bad tip height")
-    if not isinstance(gv, str) or not _VERSION.match(gv):
+    if not isinstance(gv, str) or not _VERSION.fullmatch(gv):
         raise ValueError("bad grader_version")
     return h, gv
 
@@ -108,7 +108,7 @@ def _read_state(cache_dir):
         with open(os.path.join(cache_dir, "state.json"), "rb") as f:
             s = json.loads(f.read(MAX_BYTES))
         if (isinstance(s, dict) and isinstance(s.get("grader_version"), str)
-                and _VERSION.match(s["grader_version"])
+                and _VERSION.fullmatch(s["grader_version"])
                 and _is_int(s.get("last_full_refresh")) and _is_int(s.get("tip_height"))):
             return s
     except (OSError, ValueError):
@@ -227,6 +227,7 @@ def _run_self_test():
                            ("bad hash", blk(1500, hash="xyz")),
                            ("height below", blk(999)), ("height above", blk(2000)),
                            ("bool share", blk(1500, sewage_share=True)),
+                           ("hash trailing newline", blk(1500, hash="a" * 64 + "\n")),
                            ("not a dict", [1, 2])]:
             check("rejects " + label, validate_block(bad, lo, hi) is None)
 
@@ -284,6 +285,16 @@ def _run_self_test():
             t[BASE + "blocks/962.json"] = b"<html>"
             check("full refresh all-or-nothing", run(d, make_opener(t, []), later, lambda s: None) != 0
                   and snap(d) == before)
+            t = dict(full)
+            t[BASE + "tip.json"] = tip(963500, "v2\n")
+            check("grader_version trailing newline -> tip rejected",
+                  run(d, make_opener(t, []), later, lambda s: None) != 0 and snap(d) == before)
+            st = json.load(open(os.path.join(d, "state.json")))
+            st["grader_version"] = "v1\n"
+            _write(os.path.join(d, "state.json"), st)
+            check("state with newline grader_version ignored", _read_state(d) is None)
+            with open(os.path.join(d, "state.json"), "wb") as f:
+                f.write(before["state.json"])
             check("no tmp files left", not [f for f in os.listdir(d) if f.endswith(".tmp")])
 
     def test_hourly_run_two_requests():
