@@ -22,9 +22,12 @@ clone of this repo, so a push here cannot change what runs on the host.
   `cesspool-fetch --self-test` runs its checks (no network).
 - `seed-stable.py` lists consistently reachable nodes (`stable-nodes.json`).
 - `seed-publish` turns the newest census line and the whole series into `data.json`, `history.json`,
-  `policy-history.json`, `releases.json`, `seeds.txt` and `stable-nodes.json`, and pushes them with a
-  repo-scoped deploy key.
-- `policy_model.py`, `gen_releases.py`, `gen_policy_history.py` are the shared Python that
+  `policy-history.json`, `releases.json`, `spam-share.json`, `seeds.txt` and `stable-nodes.json`, and
+  pushes them with a repo-scoped deploy key. `spam-share.json` comes from `gen_spam_share.py`, which
+  reads the cesspool cache (`CESSPOOL_CACHE`, default `/var/lib/census-cesspool`, read-only) and
+  `census.jsonl`; if it fails or the cache is missing the previous file is kept and the publish
+  carries on.
+- `policy_model.py`, `gen_releases.py`, `gen_policy_history.py`, `gen_spam_share.py` are the shared Python that
   `seed-publish` imports (`seed-publish --self-test` runs their checks, and also
   `seed-census --self-test` — it resolves `seed-census` on `PATH`, or `SEED_CENSUS=/path/to/it`).
 - `data.json` additions: `versions_storage` (canonicalized), `policy` (`{id,name,short}` of the
@@ -44,7 +47,7 @@ install -m 0755 tools/seed-census         /usr/local/bin/seed-census
 install -m 0755 tools/seed-stable.py      /usr/local/bin/seed-stable
 install -m 0755 tools/seed-publish        /usr/local/bin/seed-publish
 install -d -m 0755 /usr/local/lib/census-tools
-install -m 0755 tools/policy_model.py tools/gen_releases.py tools/gen_policy_history.py /usr/local/lib/census-tools/
+install -m 0755 tools/policy_model.py tools/gen_releases.py tools/gen_policy_history.py tools/gen_spam_share.py /usr/local/lib/census-tools/
 install -m 0600 tools/seed-publish.default.example /etc/default/seed-publish   # then edit
 cp -r tools/systemd/* /etc/systemd/system/
 systemctl daemon-reload && systemctl enable --now seed-census.timer seed-publish.timer

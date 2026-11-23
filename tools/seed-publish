@@ -65,6 +65,10 @@ GIT_EMAIL="${GIT_EMAIL:-seed-publish@localhost}"
 POLICIES="${POLICIES:-$WORK/policies.json}"
 TOOLS="${TOOLS:-/usr/local/lib/census-tools}"
 export TOOLS
+# Cache written by cesspool-fetch (a separate unprivileged user; see tools/README.md). DATA, not
+# code, and read-only here: gen_spam_share.py only reads it, and a missing or empty cache is fine
+# (spam-share.json then carries no block figures). A fetch failure never blocks the publish.
+CESSPOOL_CACHE="${CESSPOOL_CACHE:-/var/lib/census-cesspool}"
 
 for _old in ACTIVATION ACTIVATION_END ENFORCING_MIN_VERSION ENFORCING_JSON; do
     eval "_v=\${$_old:-}"
@@ -266,7 +270,7 @@ PY
     # Also run the shared tools' own self-tests (policy model, the two generators and the
     # stable-list window rule), so one --self-test proves every consensus-sensitive path.
     # Requires the clone to be present.
-    for _m in policy_model gen_releases gen_policy_history seed-stable; do
+    for _m in policy_model gen_releases gen_policy_history gen_spam_share seed-stable; do
         # seed-stable is installed on PATH on the seed host (that is how the publish step
         # below finds it), so fall back to that when it is not next to the modules.
         _p="$TOOLS/$_m.py"
@@ -631,6 +635,10 @@ gen_one() {  # <script> <out> <args...>
 }
 gen_one gen_releases.py releases.json "$CENSUS"
 gen_one gen_policy_history.py policy-history.json "$CENSUS" "$POLICIES"
+# spam-share.json: node-side filtering share from census.jsonl next to the block-side sewage share
+# from the cesspool cache. A failure here (or a stale cache) keeps the previous file, never fails
+# the publish.
+gen_one gen_spam_share.py spam-share.json "$CESSPOOL_CACHE" "$CENSUS"
 
 # Stable-node list, for people running a curated fixed-list seed. Evidence for a
 # human to curate from, not a list to serve unexamined.
@@ -702,7 +710,7 @@ if [ -f stable-nodes.json ]; then
     git add -- stable-nodes.json \
         || echo "could not stage stable-nodes.json, continuing without it" >&2
 fi
-for _f in releases.json policy-history.json; do
+for _f in releases.json policy-history.json spam-share.json; do
     [ -f "$_f" ] && { git add -- "$_f" || echo "could not stage $_f, continuing without it" >&2; }
 done
 if [ -f seeds.txt ]; then
