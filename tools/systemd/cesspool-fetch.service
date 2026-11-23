@@ -1,0 +1,19 @@
+[Unit]
+Description=Fetch cesspool.lol block grades into a validated cache
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=census-fetch
+StateDirectory=census-cesspool
+ExecStart=/usr/bin/python3 -I /usr/local/bin/cesspool-fetch
+StandardOutput=null
+# Unprivileged: no deploy key, no site clone; writes only its own cache.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/census-cesspool
+ProtectHome=yes
+PrivateTmp=yes
+RestrictSUIDSGID=true
+LockPersonality=true

@@ -1,0 +1,12 @@
+[Unit]
+Description=Fetch cesspool.lol block grades hourly
+
+[Timer]
+# Lands before seed-publish (OnBootSec=10min) so it publishes fresh grades.
+OnBootSec=8min
+OnUnitActiveSec=1h
+RandomizedDelaySec=2min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
