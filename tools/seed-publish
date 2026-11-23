@@ -66,8 +66,9 @@ POLICIES="${POLICIES:-$WORK/policies.json}"
 TOOLS="${TOOLS:-/usr/local/lib/census-tools}"
 export TOOLS
 # Cache written by cesspool-fetch (a separate unprivileged user; see tools/README.md). DATA, not
-# code, and read-only here: gen_spam_share.py only reads it, and a missing or empty cache is fine
-# (spam-share.json then carries no block figures). A fetch failure never blocks the publish.
+# code, and read-only here: gen_spam_share.py only reads it. A missing or unreadable cache keeps
+# the previous spam-share.json (or writes one with blocks: [] on the very first publish; see the
+# spam-share step below). A fetch failure never blocks the publish.
 CESSPOOL_CACHE="${CESSPOOL_CACHE:-/var/lib/census-cesspool}"
 
 for _old in ACTIVATION ACTIVATION_END ENFORCING_MIN_VERSION ENFORCING_JSON; do
