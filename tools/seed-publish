@@ -636,9 +636,16 @@ gen_one() {  # <script> <out> <args...>
 gen_one gen_releases.py releases.json "$CENSUS"
 gen_one gen_policy_history.py policy-history.json "$CENSUS" "$POLICIES"
 # spam-share.json: node-side filtering share from census.jsonl next to the block-side sewage share
-# from the cesspool cache. A failure here (or a stale cache) keeps the previous file, never fails
-# the publish.
-gen_one gen_spam_share.py spam-share.json "$CESSPOOL_CACHE" "$CENSUS"
+# from the cesspool cache. Never fails the publish. A generator failure keeps the previous file
+# (gen_one). A missing or unreadable cache (no readable state.json) also keeps the previous file,
+# so a fetcher outage cannot blank the panel; only on the very first publish, when there is no
+# file yet, is one written with blocks: []. A stale but present cache regenerates from the stale
+# data (the panel shows its latest_block).
+if [ -f "$CESSPOOL_CACHE/state.json" ] && [ -r "$CESSPOOL_CACHE/state.json" ] || [ ! -f spam-share.json ]; then
+    gen_one gen_spam_share.py spam-share.json "$CESSPOOL_CACHE" "$CENSUS"
+else
+    echo "spam-share: cesspool cache missing or unreadable, keeping the previous spam-share.json" >&2
+fi
 
 # Stable-node list, for people running a curated fixed-list seed. Evidence for a
 # human to curate from, not a list to serve unexamined.

@@ -25,8 +25,10 @@ clone of this repo, so a push here cannot change what runs on the host.
   `policy-history.json`, `releases.json`, `spam-share.json`, `seeds.txt` and `stable-nodes.json`, and
   pushes them with a repo-scoped deploy key. `spam-share.json` comes from `gen_spam_share.py`, which
   reads the cesspool cache (`CESSPOOL_CACHE`, default `/var/lib/census-cesspool`, read-only) and
-  `census.jsonl`; if it fails or the cache is missing the previous file is kept and the publish
-  carries on.
+  `census.jsonl`. It never fails the publish: a generator failure keeps the previous file; a
+  missing or unreadable cache (no readable `state.json`) keeps the previous file, or on the very
+  first publish writes one with `blocks: []`; a stale but present cache regenerates from the stale
+  data (the panel shows its latest block).
 - `policy_model.py`, `gen_releases.py`, `gen_policy_history.py`, `gen_spam_share.py` are the shared Python that
   `seed-publish` imports (`seed-publish --self-test` runs their checks, and also
   `seed-census --self-test` — it resolves `seed-census` on `PATH`, or `SEED_CENSUS=/path/to/it`).
