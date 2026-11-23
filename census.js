@@ -1156,14 +1156,141 @@ function drawPolicyChart() {
     "policy's release.";
 }
 
+// ---- block spam grades vs filtering nodes (spam-share.json) ----
+// Two independent series: cesspool.lol's daily sewage share of block weight, and the share of
+// this census's rated-good nodes running filtering software. Every value is untrusted: numbers
+// only through numOr/finite checks, text only through textContent, and the only links are the
+// two fixed cesspool URLs. A missing or unusable file hides the section.
+let SPAM_SERIES = null;   // {blocks:[{ts,share}], nodes:[{ts,share,plumb}], grader, height, last24}
+const SS_COL = { sewage: "var(--beacon)", filt: "var(--signal)", plumb: "var(--vp-plumb)" };
+
+function renderSpamShare(d) {
+  const sec = $("spamShareSection");
+  if (!sec) return;
+  if (!obj(d)) { sec.hidden = true; return; }
+  const frac = v => { const x = numOr(v, null); return x !== null && x >= 0 && x <= 1 ? x : null; };
+  const nodes = [];
+  for (const r of Array.isArray(d.nodes) ? d.nodes : []) {
+    if (!obj(r)) continue;
+    const ts = numOr(r.ts, null), rg = numOr(r.rated_good, null);
+    const share = frac(r.share);
+    if (ts === null || ts <= 0 || rg === null || rg <= 0 || share === null) continue;
+    const pl = Math.max(0, numOr(r.plumb, 0));
+    nodes.push({ ts, share, plumb: clamp(pl / rg, 0, 1), rated: rg });
+  }
+  nodes.sort((a, b) => a.ts - b.ts);
+  if (nodes.length < 2) { sec.hidden = true; return; }
+  const blocks = [];
+  for (const r of Array.isArray(d.blocks) ? d.blocks : []) {
+    if (!obj(r)) continue;
+    const day = numOr(r.day, null), share = frac(r.share);
+    if (day === null || day <= 0 || share === null) continue;
+    blocks.push({ ts: day * 86400 + 43200, share });   // plotted at midday of the UTC day
+  }
+  blocks.sort((a, b) => a.ts - b.ts);
+  const gv = typeof d.grader_version === "string" && /^[A-Za-z0-9.+_-]{1,64}$/.test(d.grader_version)
+    ? d.grader_version : null;
+  const lb = obj(d.latest_block) ? d.latest_block : null;
+  const height = lb ? numOr(lb.height, null) : null;
+  const l24 = obj(d.last24h) ? frac(d.last24h.share) : null;
+  SPAM_SERIES = { blocks, nodes, grader: gv, last24: l24,
+    height: height !== null && height > 0 ? Math.floor(height) : null };
+  sec.hidden = false;
+  drawSpamChart();
+}
+
+function drawSpamChart() {
+  const host = $("ssHost");
+  if (!host || !SPAM_SERIES) return;
+  const { blocks, nodes } = SPAM_SERIES;
+  const haveBlocks = blocks.length >= 2;
+  const old = host.querySelector("svg"); if (old) old.remove();
+
+  const W = Math.max(280, Math.round(numOr(host.clientWidth, 0) || 600));
+  const H = W < 430 ? 200 : W < 640 ? 225 : 250;
+  const padL = 36, padR = W < 430 ? 16 : 24, padT = 12, padB = 34;
+  const pw = Math.max(10, W - padL - padR), ph = Math.max(10, H - padT - padB);
+  const all = nodes.map(p => p.ts).concat(haveBlocks ? blocks.map(p => p.ts) : []);
+  const t0 = Math.min(...all), t1 = Math.max(...all), spanT = (t1 - t0) || 1;
+  const n1 = v => Math.round(v * 10) / 10;
+  const X = ts => padL + (ts - t0) / spanT * pw;
+  const Y = pct => padT + (1 - clamp(pct, 0, 100) / 100) * ph;
+
+  let grid = "";
+  for (const v of [0, 25, 50, 75, 100]) {
+    grid += '<line class="ch-grid" x1="' + padL + '" y1="' + n1(Y(v)) + '" x2="' + n1(padL + pw) +
+      '" y2="' + n1(Y(v)) + '"/><text class="ch-axis" x="' + (padL - 7) + '" y="' + n1(Y(v) + 3.5) +
+      '" text-anchor="end">' + v + "%</text>";
+  }
+  const spansYear = new Date(t0 * 1000).getUTCFullYear() !== new Date(t1 * 1000).getUTCFullYear();
+  const nTicks = W < 420 ? 3 : W < 640 ? 4 : 6; let xax = "";
+  for (let k = 0; k < nTicks; k++) {
+    const ts = t0 + k * spanT / (nTicks - 1), d = new Date(ts * 1000);
+    const anchor = k === 0 ? "start" : k === nTicks - 1 ? "end" : "middle";
+    xax += '<text class="ch-axis" x="' + n1(X(ts)) + '" y="' + (padT + ph + 15) +
+      '" text-anchor="' + anchor + '">' + esc(spansYear ? dayLabelFull(d) : dayLabel(d)) + "</text>";
+  }
+  const line = (series, key, col, cls) => {
+    let dp = "";
+    for (const p of series) dp += (dp ? " L" : "M") + n1(X(p.ts)) + " " + n1(Y(p[key] * 100));
+    const l = series[series.length - 1];
+    return '<path class="pc-line' + (cls ? " " + cls : "") + '" d="' + dp + '" style="stroke:' + col + '"/>' +
+      (cls ? "" : '<circle class="pc-dot" cx="' + n1(X(l.ts)) + '" cy="' + n1(Y(l[key] * 100)) +
+        '" r="3.5" style="fill:' + col + '"/>');
+  };
+  let lines = "";
+  if (haveBlocks) lines += line(blocks, "share", SS_COL.sewage);
+  lines += line(nodes, "share", SS_COL.filt);
+  lines += line(nodes, "plumb", SS_COL.plumb, "thin");
+
+  const aria = "Line chart over time, in percent: the daily share of block weight that cesspool.lol " +
+    "grades as sewage, and the share of rated-good nodes running filtering software, with a thin " +
+    "line for Plumb alone. Two separate measurements.";
+  host.insertAdjacentHTML("afterbegin",
+    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' +
+    esc(aria) + '">' + grid + xax + lines + "</svg>");
+
+  const lastN = nodes[nodes.length - 1];
+  const items = [];
+  if (haveBlocks) items.push([SS_COL.sewage, "Sewage share of block weight (daily, cesspool.lol)", null]);
+  items.push([SS_COL.filt, "Rated-good nodes running filtering software (Knots 29.5.1+ or Plumb)",
+    Math.round(lastN.share * 100) + "%"]);
+  items.push([SS_COL.plumb, "of which Plumb", Math.round(lastN.plumb * 100) + "%"]);
+  $("ssLegend").replaceChildren(...items.map(it => el("span", { class: "pc-leg" },
+    el("span", { class: "pc-sw", style: "background:" + it[0] }),
+    el("span", null, it[1] + (it[2] ? " " : "")),
+    it[2] ? el("span", { class: "pv" }, it[2]) : null)));
+
+  // Headline. Numbers and text only as text nodes; the links are the two fixed cesspool URLs,
+  // the second built from a number.
+  const pc1 = v => (Math.round(v * 1000) / 10) + "%";
+  const src = el("span", { class: "ss-src" }, "Block grades: ",
+    el("a", { href: "https://cesspool.lol/", rel: "noopener" }, "cesspool.lol"));
+  if (SPAM_SERIES.height !== null) {
+    src.append(" · newest graded block ",
+      el("a", { href: "https://cesspool.lol/block/" + Number(SPAM_SERIES.height) + "/", rel: "noopener" },
+        "#" + fmt(SPAM_SERIES.height)));
+  }
+  $("ssNow").replaceChildren(
+    "Last 24 h: " + (SPAM_SERIES.last24 !== null ? pc1(SPAM_SERIES.last24) : "block data unavailable") +
+    " of block weight graded sewage · " + pc1(lastN.share) + " of rated-good nodes run filtering software",
+    src);
+
+  $("ssCap").textContent = "Two separate measurements. Block grades are by cesspool.lol, using Plumb's " +
+    "policy code (grader " + (SPAM_SERIES.grader || "unknown") + "). Node shares are from this " +
+    "census, rated-good nodes only. Nodes relaying with filters do not decide what miners put in " +
+    "blocks, so this chart does not show cause and effect." + (haveBlocks ? "" : " Block data unavailable.");
+}
+
 let redrawPending = false;
 window.addEventListener("resize", () => {
   if (redrawPending) return;
-  if (!POLICY_SERIES) return;
+  if (!POLICY_SERIES && !SPAM_SERIES) return;
   redrawPending = true;
   requestAnimationFrame(() => {
     redrawPending = false;
-    drawPolicyChart();
+    if (POLICY_SERIES) drawPolicyChart();
+    if (SPAM_SERIES) drawSpamChart();
   });
 });
 
@@ -1247,3 +1374,9 @@ fetch("policies.json?t=" + Date.now())
     .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(h => renderPolicyHistory(h, POLICY_LABELS))
     .catch(() => { POLICY_SERIES = null; $("policyChartSection").hidden = true; }));
+
+// spam-share.json: independent of every fetch above. Any failure leaves the section hidden.
+fetch("spam-share.json?t=" + Date.now())
+  .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  .then(renderSpamShare)
+  .catch(() => { SPAM_SERIES = null; $("spamShareSection").hidden = true; });
