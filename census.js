@@ -1156,143 +1156,433 @@ function drawPolicyChart() {
     "policy's release.";
 }
 
-// ---- block spam grades vs filtering nodes (spam-share.json) ----
-// Two independent series: cesspool.lol's daily sewage share of block weight, and the share of
-// this census's rated-good nodes running filtering software. Every value is untrusted: numbers
-// only through numOr/finite checks, text only through textContent, and the only links are the
-// two fixed cesspool URLs. A missing or unusable file hides the section.
-let SPAM_SERIES = null;   // {blocks:[{ts,share}], nodes:[{ts,share,plumb}], grader, height, last24}
-const SS_COL = { sewage: "var(--beacon)", filt: "var(--signal)", plumb: "var(--vp-plumb)" };
+// ---- spam share and node versions (spam-share.json) ----
+// Two panels on one UTC-day axis: the daily spam share of block weight (cesspool.lol's sewage
+// share) with each era's average, and the version shares of rated-good nodes. All aggregation is
+// done by tools/gen_spam_share.py; this only validates and draws. Every value is untrusted:
+// numbers only through numOr and range checks, text only through textContent, and the only links
+// are the fixed cesspool URLs (the block one built from a number). A missing or unusable file
+// hides the section; a file without usable block days shows the headline only.
+let SPAM_SERIES = null;   // {days, groups, markers, eras, grader, last24, btime, height, ...}
+const SS_NS = "http://www.w3.org/2000/svg";
+const SS_BLUES = ["var(--ss-v1)", "var(--ss-v2)", "var(--ss-v3)", "var(--ss-v4)", "var(--ss-v5)"];
+const SS_GROUP = /^(?:[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|Plumb|other)$/;
+const SS_ERA = /^(?:all days|(?:before )?[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$/;
+const SS_STYLE = {
+  halo: "paint-order:stroke;stroke:var(--surface);stroke-width:3px",
+  era: "fill:var(--text);font-size:10.5px;font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:3px"
+};
+const ssSvg = (name, attrs, text) => {
+  const e = document.createElementNS(SS_NS, name);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (text !== null && text !== undefined) e.textContent = text;
+  return e;
+};
+// "YYYY-MM-DD" -> UTC day number, or null when it is not a real calendar date.
+const ssDay = s => {
+  if (typeof s !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return null;
+  const ms = Date.parse(s + "T00:00:00Z");
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === s ? Math.round(ms / 864e5) : null;
+};
+const ssIso = n => new Date(n * 864e5).toISOString().slice(0, 10);
+const ssLabel = s => MONTHS[+s.slice(5, 7) - 1] + " " + (+s.slice(8));
+const ssP1 = v => v.toFixed(1);
+const ssGroupLabel = g => g === "other" ? "other (renamed builds)" : g;
 
 function renderSpamShare(d) {
   const sec = $("spamShareSection");
   if (!sec) return;
   if (!obj(d)) { sec.hidden = true; return; }
+  const pct = v => { const x = numOr(v, null); return x !== null && x >= 0 && x <= 100 ? x : null; };
   const frac = v => { const x = numOr(v, null); return x !== null && x >= 0 && x <= 1 ? x : null; };
-  const nodes = [];
-  for (const r of Array.isArray(d.nodes) ? d.nodes : []) {
+
+  let groups = Array.isArray(d.groups) ? d.groups.slice(0, 9) : [];
+  if (!groups.length || groups.length > 8 || groups.some(g => typeof g !== "string" || !SS_GROUP.test(g)) ||
+      new Set(groups).size !== groups.length) groups = [];
+
+  // Days: validated, then made dense (one entry per calendar day, null for a missing value)
+  // because the x axis is position in this list.
+  const rows = new Map();
+  for (const r of Array.isArray(d.days) ? d.days.slice(0, 3000) : []) {
     if (!obj(r)) continue;
-    const ts = numOr(r.ts, null), rg = numOr(r.rated_good, null);
-    const share = frac(r.share);
-    if (ts === null || ts <= 0 || rg === null || rg <= 0 || share === null) continue;
-    const pl = Math.max(0, numOr(r.plumb, 0));
-    nodes.push({ ts, share, plumb: clamp(pl / rg, 0, 1), rated: rg });
+    const dn = ssDay(r.d);
+    if (dn === null) continue;
+    const n = numOr(r.n, 0);
+    const w = pct(r.w), m = pct(r.m);
+    let s = null;
+    if (Array.isArray(r.s) && r.s.length === groups.length) {
+      const t = r.s.map(pct);
+      if (t.every(x => x !== null)) s = t;
+    }
+    const c = numOr(r.c, null);
+    rows.set(dn, { w: n > 0 ? w : null, m: n > 0 ? m : null, n: n > 0 ? n : 0, s,
+                   c: s && c !== null && c > 0 ? c : null });
   }
-  nodes.sort((a, b) => a.ts - b.ts);
-  if (nodes.length < 2) { sec.hidden = true; return; }
-  const blocks = [];
-  for (const r of Array.isArray(d.blocks) ? d.blocks : []) {
-    if (!obj(r)) continue;
-    const day = numOr(r.day, null), share = frac(r.share);
-    if (day === null || day <= 0 || share === null) continue;
-    blocks.push({ ts: day * 86400 + 43200, share });   // plotted at midday of the UTC day
+  const keys = [...rows.keys()].sort((a, b) => a - b);
+  const days = [];
+  if (groups.length && keys.length && keys[keys.length - 1] - keys[0] < 3000) {
+    for (let k = keys[0]; k <= keys[keys.length - 1]; k++) {
+      const r = rows.get(k) || { w: null, m: null, n: 0, s: null, c: null };
+      days.push({ date: ssIso(k), w: r.w, m: r.m, n: r.n, s: r.s, c: r.c });
+    }
   }
-  blocks.sort((a, b) => a.ts - b.ts);
+  const haveChart = days.filter(x => x.w !== null).length >= 2;
+  const idx = {}; days.forEach((x, i) => { idx[x.date] = i; });
+
+  const markers = [];
+  for (const r of haveChart && Array.isArray(d.releases) ? d.releases.slice(0, 40) : []) {
+    if (!obj(r) || typeof r.v !== "string" || !/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(r.v)) continue;
+    if (typeof r.d === "string" && r.d in idx) markers.push({ v: r.v, date: r.d });
+  }
+  const eras = [];
+  for (const r of haveChart && Array.isArray(d.eras) ? d.eras.slice(0, 40) : []) {
+    if (!obj(r) || typeof r.name !== "string" || !SS_ERA.test(r.name)) continue;
+    const w = pct(r.w), m = pct(r.m), n = numOr(r.n, null);
+    if (w === null || m === null || n === null || n < 0) continue;
+    if (typeof r.start === "string" && r.start in idx && typeof r.end === "string" && r.end in idx &&
+        idx[r.start] <= idx[r.end]) eras.push({ name: r.name, start: r.start, end: r.end, w, m, n });
+  }
+  // First day with version data, and the run of small-sample days that starts there.
+  const smallBelow = numOr(d.small_below, 0);
+  const firstS = days.findIndex(x => x.s);
+  let smallEnd = -1, smallMin = 0, smallMax = 0;
+  if (firstS >= 0) {
+    let i = firstS;
+    while (i < days.length && days[i].s && days[i].c !== null && days[i].c < smallBelow) i++;
+    smallEnd = i - 1;
+    if (smallEnd >= firstS) {
+      const cs = days.slice(firstS, smallEnd + 1).map(x => x.c);
+      smallMin = Math.min(...cs); smallMax = Math.max(...cs);
+    }
+  }
   const gv = typeof d.grader_version === "string" && /^[A-Za-z0-9.+_-]{1,64}$/.test(d.grader_version)
     ? d.grader_version : null;
   const lb = obj(d.latest_block) ? d.latest_block : null;
   const height = lb ? numOr(lb.height, null) : null;
-  const l24 = obj(d.last24h) ? frac(d.last24h.share) : null;
   const btime = lb ? numOr(lb.time, null) : null;
-  SPAM_SERIES = { blocks, nodes, grader: gv, last24: l24,
+  SPAM_SERIES = {
+    days, idx, groups: haveChart ? groups : [], markers, eras, haveChart,
+    grader: gv, last24: obj(d.last24h) ? frac(d.last24h.share) : null,
     btime: btime !== null && btime > 0 ? btime : null,
-    height: height !== null && height > 0 ? Math.floor(height) : null };
+    height: height !== null && height > 0 ? Math.floor(height) : null,
+    firstPartial: d.first_partial === true, firstS, smallEnd, smallMin, smallMax,
+    cursor: Math.max(0, days.length - 1)
+  };
   sec.hidden = false;
   drawSpamChart();
 }
 
-function drawSpamChart() {
-  const host = $("ssHost");
-  if (!host || !SPAM_SERIES) return;
-  const { blocks, nodes } = SPAM_SERIES;
-  const haveBlocks = blocks.length >= 2;
-  const old = host.querySelector("svg"); if (old) old.remove();
-
-  const W = Math.max(280, Math.round(numOr(host.clientWidth, 0) || 600));
-  const H = W < 430 ? 200 : W < 640 ? 225 : 250;
-  const padL = 36, padR = W < 430 ? 16 : 24, padT = 12, padB = 34;
-  const pw = Math.max(10, W - padL - padR), ph = Math.max(10, H - padT - padB);
-  const all = nodes.map(p => p.ts).concat(haveBlocks ? blocks.map(p => p.ts) : []);
-  const t0 = Math.min(...all), t1 = Math.max(...all), spanT = (t1 - t0) || 1;
-  const n1 = v => Math.round(v * 10) / 10;
-  const X = ts => padL + (ts - t0) / spanT * pw;
-  const Y = pct => padT + (1 - clamp(pct, 0, 100) / 100) * ph;
-
-  let grid = "";
-  for (const v of [0, 25, 50, 75, 100]) {
-    grid += '<line class="ch-grid" x1="' + padL + '" y1="' + n1(Y(v)) + '" x2="' + n1(padL + pw) +
-      '" y2="' + n1(Y(v)) + '"/><text class="ch-axis" x="' + (padL - 7) + '" y="' + n1(Y(v) + 3.5) +
-      '" text-anchor="end">' + v + "%</text>";
-  }
-  const spansYear = new Date(t0 * 1000).getUTCFullYear() !== new Date(t1 * 1000).getUTCFullYear();
-  const nTicks = W < 420 ? 3 : W < 640 ? 4 : 6; let xax = "";
-  for (let k = 0; k < nTicks; k++) {
-    const ts = t0 + k * spanT / (nTicks - 1), d = new Date(ts * 1000);
-    const anchor = k === 0 ? "start" : k === nTicks - 1 ? "end" : "middle";
-    xax += '<text class="ch-axis" x="' + n1(X(ts)) + '" y="' + (padT + ph + 15) +
-      '" text-anchor="' + anchor + '">' + esc(spansYear ? dayLabelFull(d) : dayLabel(d)) + "</text>";
-  }
-  const line = (series, key, col, cls) => {
-    let dp = "";
-    for (const p of series) dp += (dp ? " L" : "M") + n1(X(p.ts)) + " " + n1(Y(p[key] * 100));
-    const l = series[series.length - 1];
-    return '<path class="pc-line' + (cls ? " " + cls : "") + '" d="' + dp + '" style="stroke:' + col + '"/>' +
-      (cls ? "" : '<circle class="pc-dot" cx="' + n1(X(l.ts)) + '" cy="' + n1(Y(l[key] * 100)) +
-        '" r="3.5" style="fill:' + col + '"/>');
-  };
-  let lines = "";
-  if (haveBlocks) lines += line(blocks, "share", SS_COL.sewage);
-  lines += line(nodes, "share", SS_COL.filt);
-  lines += line(nodes, "plumb", SS_COL.plumb, "thin");
-
-  const aria = "Line chart over time, in percent: the daily share of block weight that cesspool.lol " +
-    "grades as sewage, and the share of rated-good nodes running filtering software, with a thin " +
-    "line for Plumb alone. Two separate measurements.";
-  host.insertAdjacentHTML("afterbegin",
-    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' +
-    esc(aria) + '">' + grid + xax + lines + "</svg>");
-
-  const lastN = nodes[nodes.length - 1];
+function ssBandColour(groups, g) {
+  if (g === "Plumb") return "var(--ss-plumb)";
+  if (g === "other") return "var(--ss-other)";
+  const vers = groups.filter(x => x !== "Plumb" && x !== "other");
+  return SS_BLUES[Math.max(0, SS_BLUES.length - vers.length) + vers.indexOf(g)] || SS_BLUES[SS_BLUES.length - 1];
+}
+function ssSwatch(S, g) {
+  const col = ssBandColour(S.groups, g);
+  const s = ssSvg("svg", { width: 16, height: 12, "aria-hidden": "true" });
+  s.appendChild(ssSvg("rect", { x: 0, y: 1, width: 16, height: 10, fill: col,
+    stroke: (g === "Plumb" || g === "other") ? col : "var(--text-3)", "stroke-width": 0.5 }));
+  if (g === "other") s.appendChild(ssSvg("path", { d: "M0 11L11 0M5 11L16 0", stroke: "var(--surface)", "stroke-width": 1.5 }));
+  return s;
+}
+function ssLegend(S) {
   const items = [];
-  if (haveBlocks) items.push([SS_COL.sewage, "Sewage share of block weight (daily, cesspool.lol)", null]);
-  items.push([SS_COL.filt, "Rated-good nodes running filtering software (Knots 29.5.1+ or Plumb)",
-    Math.round(lastN.share * 100) + "%"]);
-  items.push([SS_COL.plumb, "of which Plumb", Math.round(lastN.plumb * 100) + "%"]);
-  $("ssLegend").replaceChildren(...items.map(it => el("span", { class: "pc-leg" },
-    el("span", { class: "pc-sw", style: "background:" + it[0] }),
-    el("span", null, it[1] + (it[2] ? " " : "")),
-    it[2] ? el("span", { class: "pv" }, it[2]) : null)));
+  const add = (svg, text) => items.push(el("li", null, svg, el("span", null, text)));
+  for (const g of S.groups) add(ssSwatch(S, g), ssGroupLabel(g));
+  let s = ssSvg("svg", { width: 18, height: 12, "aria-hidden": "true" });
+  s.appendChild(ssSvg("line", { x1: 0, x2: 18, y1: 6, y2: 6, stroke: "var(--beacon)", "stroke-width": 2.5, "stroke-linecap": "round" }));
+  add(s, "Spam share of block weight (daily, weighted)");
+  s = ssSvg("svg", { width: 18, height: 12, "aria-hidden": "true" });
+  s.appendChild(ssSvg("line", { x1: 0, x2: 18, y1: 6, y2: 6, stroke: "var(--text-2)", "stroke-width": 1.5 }));
+  add(s, "Era weighted average");
+  if (S.markers.length) {
+    s = ssSvg("svg", { width: 18, height: 12, "aria-hidden": "true" });
+    s.appendChild(ssSvg("line", { x1: 9, x2: 9, y1: 0, y2: 12, stroke: "var(--text-2)", "stroke-width": 1.5, "stroke-dasharray": "3 2" }));
+    add(s, "Dashed line: version first seen by the census");
+  }
+  if (S.smallEnd >= S.firstS && S.firstS >= 0) {
+    s = ssSvg("svg", { width: 16, height: 12, "aria-hidden": "true" });
+    s.appendChild(ssSvg("rect", { x: 0, y: 1, width: 16, height: 10, fill: "var(--surface-2)", stroke: "var(--text-3)", "stroke-width": 0.5 }));
+    s.appendChild(ssSvg("path", { d: "M-2 11L9 0M3 13L16 0M9 13L18 4", stroke: "var(--text-3)", "stroke-width": 1 }));
+    add(s, "Hatched: small census sample (" + fmt(S.smallMin) + " to " + fmt(S.smallMax) +
+      " nodes), before " + S.days[S.smallEnd + 1 < S.days.length ? S.smallEnd + 1 : S.smallEnd].date);
+  }
+  $("ssLegend").replaceChildren(...items);
+}
 
-  // Headline. Numbers and text only as text nodes; the links are the two fixed cesspool URLs,
-  // the second built from a number.
+function drawSpamChart() {
+  const S = SPAM_SERIES, box = $("ssHost");
+  if (!box || !S) return;
+  const days = S.days, N = days.length;
+  const chartEls = ["ssLegend", "ssHost", "ssReadout", "ssHint", "ssEras"];
+  for (const id of chartEls) { const e = $(id); if (e) e.hidden = !S.haveChart; }
+  drawSpamHeadline(S);
+  if (!S.haveChart) { box.replaceChildren(); return; }
+
+  const W = Math.max(280, Math.floor(numOr(box.clientWidth, 0) || 600));
+  const narrow = W < 520;
+  const ml = narrow ? 32 : 40, mr = narrow ? 6 : 12, mt = 40, mb = 26;
+  const pw = W - ml - mr;
+  const hTop = narrow ? 130 : 170, hBot = narrow ? 150 : 190, gap = 40;
+  const H = mt + hTop + gap + hBot + mb;
+  const top = { y: mt, h: hTop }, bot = { y: mt + hTop + gap, h: hBot };
+  const spamMax = Math.max(...days.map(x => x.w === null ? 0 : x.w));
+  const ymax = Math.max(10, Math.ceil(spamMax / 10) * 10);
+  const X = i => ml + i / (N - 1) * pw;
+  const Ys = v => top.y + top.h * (1 - v / ymax);
+  const Yv = v => bot.y + bot.h * (1 - v / 100);
+  const step = pw / (N - 1);
+  const f = v => v.toFixed(1);
+  const halo = SS_STYLE.halo;
+
+  const svg = ssSvg("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img",
+    "aria-label": "Daily spam share of block weight, with each era's average, above stacked node version shares, " +
+      days[0].date + " to " + days[N - 1].date });
+  const defs = ssSvg("defs");
+  const pat = ssSvg("pattern", { id: "ssHatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+  pat.appendChild(ssSvg("line", { x1: 0, y1: 0, x2: 0, y2: 6, stroke: "var(--surface)", "stroke-width": 2.5 }));
+  defs.appendChild(pat);
+  const patO = ssSvg("pattern", { id: "ssHatchO", width: 4, height: 4, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+  patO.appendChild(ssSvg("line", { x1: 0, y1: 0, x2: 0, y2: 4, stroke: "var(--surface)", "stroke-width": 1.5 }));
+  defs.appendChild(patO);
+  svg.appendChild(defs);
+
+  const yaxis = (ticks, Y) => ticks.forEach(t => {
+    svg.appendChild(ssSvg("line", { x1: ml, x2: ml + pw, y1: Y(t), y2: Y(t), stroke: "var(--line-soft)", "stroke-width": 1 }));
+    svg.appendChild(ssSvg("text", { x: ml - 5, y: Y(t) + 3.5, "text-anchor": "end", class: "ch-axis" }, t + "%"));
+  });
+  const ticksSpam = []; for (let t = 0; t <= ymax; t += ymax > 40 ? 20 : 10) ticksSpam.push(t);
+  yaxis(ticksSpam, Ys);
+  yaxis([0, 50, 100], Yv);
+  const title = (y, text) => svg.appendChild(ssSvg("text", { x: ml, y, "text-anchor": "start", class: "ch-axis", style: halo }, text));
+  title(top.y - 6, "Spam share (weighted)");
+  title(bot.y - 6, "Share of rated-good nodes by version");
+
+  // x ticks: the 1st and 15th of each month, as many as fit
+  const yb = bot.y + bot.h;
+  let lastX = -1e9;
+  days.forEach((x, i) => {
+    const dom = +x.date.slice(8);
+    if (dom !== 1 && dom !== 15) return;
+    const px = X(i);
+    if (px - lastX < (narrow ? 56 : 72) || px < ml + 14 || px > ml + pw - 14) return;
+    lastX = px;
+    svg.appendChild(ssSvg("line", { x1: px, x2: px, y1: yb, y2: yb + 4, stroke: "var(--text-3)" }));
+    svg.appendChild(ssSvg("text", { x: px, y: yb + 17, "text-anchor": "middle", class: "ch-axis" }, ssLabel(x.date)));
+  });
+  svg.appendChild(ssSvg("line", { x1: ml, x2: ml + pw, y1: yb, y2: yb, stroke: "var(--text-3)" }));
+
+  // stacked version areas, one run per stretch of days that have version data
+  const gAreas = ssSvg("g");
+  const runs = [];
+  days.forEach((x, i) => {
+    if (!x.s) return;
+    const r = runs[runs.length - 1];
+    if (r && r.b === i - 1) r.b = i; else runs.push({ a: i, b: i });
+  });
+  const cum = days.map(() => 0);
+  S.groups.forEach((g, gi) => {
+    for (const r of runs) {
+      const tp = [], bt = [];
+      const lo = r.a === r.b ? -step / 2 : 0, hi = r.a === r.b ? step / 2 : 0;
+      for (let i = r.a; i <= r.b; i++) {
+        const b0 = cum[i]; cum[i] = b0 + days[i].s[gi];
+        tp.push([X(i) + (i === r.a ? lo : 0) + (i === r.b ? hi : 0), Yv(cum[i])]);
+        bt.push([X(i) + (i === r.a ? lo : 0) + (i === r.b ? hi : 0), Yv(b0)]);
+      }
+      const pts = p => p[0].toFixed(1) + " " + p[1].toFixed(1);
+      const dpath = "M" + tp.map(pts).join("L") + "L" + bt.reverse().map(pts).join("L") + "Z";
+      const thin = g === "Plumb" || g === "other";
+      const col = ssBandColour(S.groups, g);
+      const a = ssSvg("path", { d: dpath, fill: col, stroke: thin ? col : "var(--surface)",
+        "stroke-width": thin ? 1.6 : 1.5, "stroke-linejoin": "round" });
+      a.appendChild(ssSvg("title", null, ssGroupLabel(g)));
+      gAreas.appendChild(a);
+      if (g === "other") gAreas.appendChild(ssSvg("path", { d: dpath, fill: "url(#ssHatchO)", stroke: "none" }));
+    }
+  });
+  svg.appendChild(gAreas);
+  // days without version data
+  let gi0 = 0;
+  while (gi0 < N) {
+    if (days[gi0].s) { gi0++; continue; }
+    let gi1 = gi0; while (gi1 + 1 < N && !days[gi1 + 1].s) gi1++;
+    const x0 = gi0 === 0 ? X(0) : X(gi0) - step / 2, x1 = gi1 === N - 1 ? X(N - 1) : X(gi1) + step / 2;
+    svg.appendChild(ssSvg("rect", { x: x0, y: bot.y, width: Math.max(0, x1 - x0), height: bot.h, fill: "var(--surface-2)", opacity: 0.55 }));
+    if (gi0 === 0 && x1 - x0 > 56) {
+      svg.appendChild(ssSvg("text", { x: (x0 + x1) / 2, y: bot.y + bot.h / 2 - 4, "text-anchor": "middle", class: "ch-axis" }, "no census"));
+      svg.appendChild(ssSvg("text", { x: (x0 + x1) / 2, y: bot.y + bot.h / 2 + 9, "text-anchor": "middle", class: "ch-axis" }, "data yet"));
+    }
+    gi0 = gi1 + 1;
+  }
+  // small census sample
+  if (S.firstS >= 0 && S.smallEnd >= S.firstS) {
+    const hx0 = X(S.firstS), hx1 = Math.min(ml + pw, X(S.smallEnd + 1));
+    svg.appendChild(ssSvg("rect", { x: hx0, y: bot.y, width: Math.max(0, hx1 - hx0), height: bot.h, fill: "url(#ssHatch)", opacity: 0.85 }));
+    svg.appendChild(ssSvg("line", { x1: hx1, x2: hx1, y1: bot.y, y2: bot.y + bot.h, stroke: "var(--surface)", "stroke-width": 1.5 }));
+  }
+
+  // era step lines with their weighted average
+  for (const e of S.eras) {
+    const a = S.idx[e.start], b = S.idx[e.end], y = Ys(e.w);
+    svg.appendChild(ssSvg("line", { x1: X(a), x2: X(b) + (b === N - 1 ? 0 : step), y1: y, y2: y,
+      stroke: "var(--text-2)", "stroke-width": 1.5 }));
+    if ((b - a + 1) * step > 30) {
+      svg.appendChild(ssSvg("text", { x: X(a) + 3, y: y > top.y + 14 ? y - 4 : y + 12, "text-anchor": "start",
+        style: SS_STYLE.era }, f(e.w) + "%"));
+    }
+  }
+  // spam line, broken at days without blocks
+  let dp = "", pen = false;
+  days.forEach((x, i) => {
+    if (x.w === null) { pen = false; return; }
+    dp += (pen ? "L" : "M") + X(i).toFixed(1) + " " + Ys(x.w).toFixed(1); pen = true;
+  });
+  svg.appendChild(ssSvg("path", { d: dp, fill: "none", stroke: "var(--beacon)", "stroke-width": 2,
+    "stroke-linejoin": "round", "stroke-linecap": "round" }));
+
+  // release markers through both panels
+  S.markers.forEach((m, k) => {
+    const x = X(S.idx[m.date]);
+    svg.appendChild(ssSvg("line", { x1: x, x2: x, y1: mt - 2, y2: yb, stroke: "var(--text-2)", "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
+    let anchor = "middle", tx = x;
+    if (x + 18 > W - 2) { anchor = "end"; tx = Math.min(x + 3, W - 2); }
+    svg.appendChild(ssSvg("text", { x: tx, y: (mt - 20) + (k % 2) * 12 + 7, "text-anchor": anchor, class: "ch-axis",
+      style: halo + ";fill:var(--text-2);font-weight:600" }, m.v));
+  });
+
+  // cursor
+  const cur = ssSvg("g", { "pointer-events": "none" });
+  const cl = ssSvg("line", { y1: mt - 2, y2: yb, stroke: "var(--text)", "stroke-width": 1 });
+  const dot = ssSvg("circle", { r: 4.5, fill: "var(--beacon)", stroke: "var(--surface)", "stroke-width": 2 });
+  cur.appendChild(cl); cur.appendChild(dot); svg.appendChild(cur);
+  S.parts = { cl, dot, X, Ys, ml, pw, svg };
+
+  box.replaceChildren(svg);
+  ssPlace();
+  if (!box.dataset.ssBound) {
+    box.dataset.ssBound = "1";
+    const setFromEvent = ev => {
+      const T = SPAM_SERIES; if (!T || !T.parts) return;
+      const r = T.parts.svg.getBoundingClientRect();
+      const n = T.days.length;
+      T.cursor = clamp(Math.round((ev.clientX - r.left - T.parts.ml) / T.parts.pw * (n - 1)), 0, n - 1);
+      ssPlace();
+    };
+    box.addEventListener("pointermove", setFromEvent);
+    box.addEventListener("pointerdown", setFromEvent);
+    box.addEventListener("keydown", ev => {
+      const T = SPAM_SERIES; if (!T || !T.parts) return;
+      const k = ev.key, n = T.days.length;
+      let i = T.cursor;
+      if (k === "ArrowLeft") i -= 1; else if (k === "ArrowRight") i += 1;
+      else if (k === "PageUp") i -= 7; else if (k === "PageDown") i += 7;
+      else if (k === "Home") i = 0; else if (k === "End") i = n - 1; else return;
+      ev.preventDefault();
+      T.cursor = clamp(i, 0, n - 1);
+      ssPlace();
+    });
+  }
+
+  ssLegend(S);
+  ssEraTable(S);
+  // thin-series note, computed from the data
+  let pm = 0, om = 0;
+  for (const x of days) {
+    if (!x.s) continue;
+    const pi = S.groups.indexOf("Plumb"), oi = S.groups.indexOf("other");
+    if (pi >= 0) pm = Math.max(pm, x.s[pi]);
+    if (oi >= 0) om = Math.max(om, x.s[oi]);
+  }
+  const bits = [];
+  if (S.groups.includes("Plumb")) bits.push("Plumb (violet) peaks at " + pm.toFixed(1) + "% of nodes");
+  if (S.groups.includes("other")) bits.push((bits.length ? "other (hatched grey)" : "Other (hatched grey)") + " at " + om.toFixed(1) + "%");
+  const thin = pm < 10 && om < 10 && bits.length;
+  $("ssHint").textContent = (bits.length ? bits.join(" and ") + (thin
+    ? ", so both are thin bands at the very top of the stack, drawn with their own colour outline. "
+    : ". ") : "") + "Exact values are in the readout." +
+    (S.firstS > 0 ? " No version data before " + days[S.firstS].date + "." : "");
+}
+
+function ssPlace() {
+  const S = SPAM_SERIES;
+  if (!S || !S.parts) return;
+  const i = S.cursor, x = S.parts.X(i), d = S.days[i];
+  S.parts.cl.setAttribute("x1", x); S.parts.cl.setAttribute("x2", x);
+  S.parts.dot.setAttribute("cx", x);
+  if (d.w === null) S.parts.dot.setAttribute("visibility", "hidden");
+  else { S.parts.dot.removeAttribute("visibility"); S.parts.dot.setAttribute("cy", S.parts.Ys(d.w)); }
+  ssReadout(S, d, i);
+}
+
+function ssReadout(S, d, i) {
+  const hd = el("div", { class: "hd" });
+  hd.append(el("span", { class: "date" }, d.date + (i === 0 && S.firstPartial ? " (partial day)" : "")));
+  const mk = S.markers.find(m => m.date === d.date);
+  if (mk) hd.append(el("span", { class: "note" }, "first seen by the census: " + mk.v));
+  if (d.s && i >= S.firstS && i <= S.smallEnd) hd.append(el("span", { class: "note" }, "small census sample (" + fmt(d.c) + " nodes)"));
+  else if (d.c !== null) hd.append(el("span", { class: "note" }, fmt(d.c) + " rated-good nodes"));
+  const sp = el("div", { class: "spam" });
+  if (d.w === null) sp.append(el("span", null, "no graded blocks this day"));
+  else {
+    sp.append(el("span", null, el("b", null, ssP1(d.w) + "%"), " spam, weighted"),
+      el("span", null, el("b", null, ssP1(d.m) + "%"), " per-block mean, " + fmt(d.n) + " blocks"));
+  }
+  const ul = el("ul");
+  S.groups.forEach((g, gi) => {
+    const v = d.s ? d.s[gi] : null;
+    ul.append(el("li", null, ssSwatch(S, g), el("b", null, v === null ? "no data" : ssP1(v) + "%"),
+      el("i", null, g)));
+  });
+  $("ssReadout").replaceChildren(hd, sp, ul);
+}
+
+function ssEraTable(S) {
+  const tb = $("ssEraBody");
+  if (!tb) return;
+  const rows = S.eras.map(e => {
+    const nd = S.idx[e.end] - S.idx[e.start] + 1;
+    const c0 = el("td", null, e.name.startsWith("before ") ? "Before " + e.name.slice(7) + " first seen"
+      : e.name === "all days" ? "All days" : e.name + " era");
+    const sm = el("small", null, e.start + " to " + e.end + " (" + nd + " day" + (nd === 1 ? "" : "s") + ")");
+    c0.append(sm);
+    if (S.firstS > 0 && S.idx[e.start] < S.firstS) sm.append("; no version data before " + S.days[S.firstS].date);
+    if (nd < 7) c0.append(el("span", { class: "ss-flag" }, nd + " day" + (nd === 1 ? "" : "s") + ", too short to judge"));
+    const bar = (v, cls) => el("div", { class: "ss-bar" + cls }, el("div", { style: "width:" + clamp(v, 0, 100) + "%" }));
+    return el("tr", null, c0, el("td", { class: "n" }, ssP1(e.w)), el("td", { class: "n" }, ssP1(e.m)),
+      el("td", { class: "n" }, fmt(e.n)), el("td", { class: "ss-bars" }, bar(e.w, ""), bar(e.m, " m")));
+  });
+  tb.replaceChildren(...rows);
+  const sec = $("ssEras"); if (sec) sec.hidden = !rows.length;
+}
+
+// Headline. Numbers and text only as text nodes; the links are fixed cesspool URLs, the second
+// built from a number. The 24 h figure is "24 h before the newest cached block", so it is only
+// "last 24 h" while that block is recent: older than 6 h, say when the block data was last
+// updated instead; with no usable 24 h figure, say the block data is unavailable.
+function drawSpamHeadline(S) {
   const pc1 = v => (Math.round(v * 1000) / 10) + "%";
   const src = el("span", { class: "ss-src" }, "Block grades: ",
     el("a", { href: "https://cesspool.lol/", rel: "noopener" }, "cesspool.lol"));
-  if (SPAM_SERIES.height !== null) {
+  if (S.grader) src.append(" · grader " + S.grader);
+  if (S.height !== null) {
     src.append(" · newest graded block ",
-      el("a", { href: "https://cesspool.lol/block/" + Number(SPAM_SERIES.height) + "/", rel: "noopener" },
-        "#" + fmt(SPAM_SERIES.height)));
+      el("a", { href: "https://cesspool.lol/block/" + Number(S.height) + "/", rel: "noopener" }, "#" + fmt(S.height)));
   }
-  // The 24 h figure is "24 h before the newest cached block", so it is only "last 24 h" while that
-  // block is recent. Older than 6 h: say when the block data was last updated instead. Not shown at
-  // all when the chart has too few block days or the newest block time is unknown.
-  const nodePart = pc1(lastN.share) + " of rated-good nodes run filtering software";
-  const bt = SPAM_SERIES.btime;
+  const bt = S.btime;
   let head;
-  if (SPAM_SERIES.last24 === null || !haveBlocks || bt === null) {
-    head = "Last 24 h: block data unavailable · " + nodePart;
+  if (S.last24 === null || bt === null) {
+    head = "Last 24 h: block data unavailable";
   } else if (Date.now() / 1000 - bt > 6 * 3600) {
     head = "Block data last updated " + new Date(bt * 1000).toISOString().slice(0, 16).replace("T", " ") +
-      " UTC (24 h to then: " + pc1(SPAM_SERIES.last24) + " of block weight graded sewage) · " + nodePart;
+      " UTC (24 h to then: " + pc1(S.last24) + " of block weight graded spam)";
   } else {
-    head = "Last 24 h: " + pc1(SPAM_SERIES.last24) + " of block weight graded sewage · " + nodePart;
+    head = "Last 24 h: " + pc1(S.last24) + " of block weight graded spam";
   }
+  const lastDay = S.haveChart ? [...S.days].reverse().find(x => x.w !== null) : null;
+  if (lastDay) head += " · whole day " + ssLabel(lastDay.date) + ": " + ssP1(lastDay.w) + "%";
   $("ssNow").replaceChildren(head, src);
-
-  $("ssCap").textContent = "Two separate measurements. Block grades are by cesspool.lol, using Plumb's " +
-    "policy code (grader " + (SPAM_SERIES.grader || "unknown") + "). Node shares are from this " +
-    "census, rated-good nodes only. Nodes relaying with filters do not decide what miners put in " +
-    "blocks, so this chart does not show cause and effect." + (haveBlocks ? "" : " Block data unavailable.");
 }
 
 let redrawPending = false;

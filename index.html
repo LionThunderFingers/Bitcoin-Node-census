@@ -18,6 +18,8 @@
   /* software-share pie: validated categorical set (see census.js VP_POOL) */
   --vp-1:#2a78d6; --vp-2:#eb6834; --vp-3:#6250d6; --vp-4:#eda100;
   --vp-rc:#1baf7a; --vp-plumb:#404B49; --vp-older:#B4C0BD; --vp-other:#6E817D;
+  --ss-v1:#cfe0f5; --ss-v2:#9dbfe9; --ss-v3:#6a9dd9; --ss-v4:#3f78bf; --ss-v5:#1f4f8c;
+  --ss-plumb:#6250d6; --ss-other:#7d8f8b;
   --sans:"Helvetica Neue",Helvetica,Arial,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   --cond:"Helvetica Neue",Helvetica,Arial,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
@@ -31,6 +33,8 @@
     --warn-bg:#2A2214;
     --vp-1:#3987e5; --vp-2:#d95926; --vp-3:#9085e9; --vp-4:#c98500;
     --vp-rc:#199e70; --vp-plumb:#B9C6C3; --vp-older:#44524F; --vp-other:#7E918C;
+    --ss-v1:#1d3d66; --ss-v2:#245891; --ss-v3:#3174c4; --ss-v4:#5b9be6; --ss-v5:#a6c9f4;
+    --ss-plumb:#9d93ee; --ss-other:#8da09c;
   }
 }
 :root[data-theme="dark"]{
@@ -42,6 +46,8 @@
   --warn-bg:#2A2214;
   --vp-1:#3987e5; --vp-2:#d95926; --vp-3:#9085e9; --vp-4:#c98500;
   --vp-rc:#199e70; --vp-plumb:#B9C6C3; --vp-older:#44524F; --vp-other:#7E918C;
+  --ss-v1:#1d3d66; --ss-v2:#245891; --ss-v3:#3174c4; --ss-v4:#5b9be6; --ss-v5:#a6c9f4;
+  --ss-plumb:#9d93ee; --ss-other:#8da09c;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
@@ -145,6 +151,36 @@ footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--line-soft);
 .ss-now .ss-src{display:block;margin-top:3px;font-size:12.5px;color:var(--text-3)}
 .ss-now a{color:var(--signal)}
 .pc-line.thin{stroke-width:1.25}
+.ss-legend[hidden],.ss-readout[hidden],.ss-hint[hidden],.ss-eras[hidden],.ss-box[hidden]{display:none}
+.ss-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 10px;padding:0;list-style:none;font-size:12.5px;color:var(--text-2)}
+.ss-legend li{display:flex;align-items:center;gap:6px}
+.ss-legend svg,.ss-readout svg{flex:none}
+.ss-box{position:relative;outline:none;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.ss-box:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.ss-box svg{display:block;max-width:100%}
+.ss-readout{margin-top:12px;border:1px solid var(--line-soft);background:var(--surface-2);padding:11px 13px;font-size:13px}
+.ss-readout .hd{display:flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline}
+.ss-readout .date{font-weight:600;font-size:14px}
+.ss-readout .note{color:var(--text-3);font-size:12px}
+.ss-readout .spam{display:flex;flex-wrap:wrap;gap:2px 18px;margin:6px 0 8px}
+.ss-readout .spam b{font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ss-readout .spam span{color:var(--text-2)}
+.ss-readout ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:3px 14px}
+.ss-readout li{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
+.ss-readout li b{font-weight:600}
+.ss-readout li i{font-style:normal;color:var(--text-2)}
+.ss-hint{margin:8px 0 0;color:var(--text-3);font-size:12px}
+.ss-eras h3{font-family:var(--cond);font-size:15px;margin:22px 0 8px}
+.ss-eras .scroll table{min-width:520px;font-size:13.5px}
+.ss-eras td:first-child{min-width:190px}
+.ss-eras td small{display:block;color:var(--text-3);font-size:11.5px}
+.ss-flag{display:block;color:var(--warn);font-size:11.5px}
+.ss-bars{min-width:120px}
+.ss-bar{height:6px;background:var(--surface-2);margin:2px 0}
+.ss-bar>div{height:100%;background:var(--beacon)}
+.ss-bar.m>div{opacity:.5}
+.ss-credit{margin:10px 0 0;font-size:13px;color:var(--text-2)}
+.ss-credit a{color:var(--signal)}
 details.dt{margin-top:12px}
 details.dt>summary{cursor:pointer;font-family:var(--sans);font-size:12px;color:var(--signal)}
 details.dt p{margin:10px 0 0;color:var(--text-2);font-size:14px;max-width:70ch}
@@ -353,22 +389,35 @@ details.dt p+p{margin-top:9px}
 
     <section id="spamShareSection" class="span2" hidden>
       <div class="sec-head">
-        <h2>Block spam grades and filtering nodes</h2>
+        <h2>Spam share and node versions</h2>
         <details class="dt"><summary>what is this?</summary>
-          <p>Two separate measurements on one time axis. The <strong>sewage share</strong> is the
-             share of each day&rsquo;s block weight that cesspool.lol grades as sewage, taken
-             from its public block data and weighted by block weight. The
-             <strong>node share</strong> is the part of this census&rsquo;s rated-good nodes whose
-             user agent is Plumb or official Knots at or above the version that carries the
-             filters. The two are not linked by this page: nodes that relay with filters do not
-             decide what miners put in blocks. Only complete UTC days are plotted; the
-             headline figure is a rolling 24 hours.</p>
+          <p>Two separate measurements on one time axis, whole UTC days. Top: the share of each
+             day&rsquo;s block weight that cesspool.lol grades as spam (its &ldquo;sewage
+             share&rdquo;), weighted by block weight, with each era&rsquo;s average as a
+             horizontal line. Bottom: the software versions of this census&rsquo;s rated-good
+             nodes. Dashed lines mark the day a final Knots release was first seen by the
+             census. Eras start on those days. The two are not linked by this page.</p>
         </details>
       </div>
       <p class="ss-now" id="ssNow"></p>
-      <div class="pc-legend" id="ssLegend"></div>
-      <div class="chart-host" id="ssHost"></div>
-      <p class="cap" id="ssCap"></p>
+      <ul class="ss-legend" id="ssLegend" aria-label="Legend"></ul>
+      <div class="ss-box" id="ssHost" tabindex="0" role="group"
+           aria-label="Spam share and node versions chart. Use the left and right arrow keys to move between days."></div>
+      <div class="ss-readout" id="ssReadout" aria-live="polite"></div>
+      <p class="ss-hint" id="ssHint"></p>
+      <div class="ss-eras" id="ssEras">
+        <h3>Era averages</h3>
+        <div class="scroll"><table>
+          <thead><tr><th>Era</th><th class="n">Weighted %</th><th class="n">Per-block mean %</th><th class="n">Blocks</th><th>Bars</th></tr></thead>
+          <tbody id="ssEraBody"></tbody>
+        </table></div>
+        <p class="cap">Eras start on the whole UTC day a final version was first seen by the census.
+           Weighted = sum(sewage share x block weight) / sum(block weight). Per-block mean = plain
+           average of each block&rsquo;s share. Bars: dark = weighted, light = per-block mean,
+           scale 0 to 100%.</p>
+      </div>
+      <p class="notes">Spam is cesspool.lol's sewage share of block weight, graded by one ruleset (mostly Plumb 15's) across the whole history. Versions are what rated-good nodes reported to this census. With DATUM the gateway's node, normally the miner's own, chooses the transactions. Versions here are all rated-good nodes, not miners' nodes, so this does not show that a version caused a change.</p>
+      <p class="ss-credit">Block grading data: <a href="https://cesspool.lol/" rel="noopener noreferrer">cesspool.lol</a>. Node versions: this census.</p>
     </section>
 
     <section id="reachabilitySection" class="span2">

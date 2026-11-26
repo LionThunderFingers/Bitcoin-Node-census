@@ -152,21 +152,24 @@ Samples whose `versions` counts do not sum to `b2b_reachable` are skipped (`tool
 
 ### spam-share.json
 
-Two separate measurements on one time axis, for the "Block spam grades and filtering nodes" chart on the page. Built hourly by `tools/gen_spam_share.py`. The file may be absent or stale if the block-data fetch failed; the previous copy is kept in that case.
+Everything the "Spam share and node versions" panel draws: the daily spam share of block weight, the version shares of rated-good nodes on the same UTC-day axis, the days final Knots releases were first seen, and the average spam share of each era between them. Built hourly by `tools/gen_spam_share.py`; all aggregation is done there, none in the browser. The file may be absent or stale if the block-data fetch failed; the previous copy is kept in that case.
 
-**Credit and licence.** The block figures (`blocks`, `last24h`, `latest_block`, `grader_version`) come from [cesspool.lol](https://cesspool.lol/), whose code is MIT-licensed ([github.com/jasonsopko/cesspool](https://github.com/jasonsopko/cesspool)) and whose site asks for credit with a link; credit it if you use them. The block grades are not covered by this repository's CC BY 4.0 data claim, which covers only what this census measures itself (the `nodes` series). Per-block pages are at `https://cesspool.lol/block/<height>/`.
+**Credit and licence.** The block figures (`days[].w`, `days[].m`, `days[].n`, `eras`, `last24h`, `latest_block`, `grader_version`) come from [cesspool.lol](https://cesspool.lol/), whose code is MIT-licensed ([github.com/jasonsopko/cesspool](https://github.com/jasonsopko/cesspool)) and whose site asks for credit with a link; credit it if you use them. The block grades are not covered by this repository's CC BY 4.0 data claim, which covers only what this census measures itself (`days[].s`, `days[].c`, `releases`). Per-block pages are at `https://cesspool.lol/block/<height>/`.
 
 | Field | Type | Meaning |
 |---|---|---|
 | `source` | object | `{name, url}`: where the block grades come from (`cesspool.lol`, `https://cesspool.lol/`). |
 | `grader_version` | string or null | Grader version reported by cesspool.lol; null if unknown. |
-| `filter_min_knots` | string | Lowest official Knots version counted as filtering software (`"29.5.1"`). |
 | `latest_block` | object or null | `{height, time}` of the newest graded block. |
-| `last24h` | object or null | `{blocks, share}`: rolling last 24 hours, `share` 0..1. Separate from `blocks`, which holds complete UTC days only. |
-| `blocks` | array | One object per complete UTC day, oldest first: `{day, blocks, share}`. `day` is the UTC day number (unix time / 86400), `blocks` the number of graded blocks that day (not a fixed ~144; early days after the difficulty change have several hundred), `share` the sewage share of block weight, 0..1, weighted by block weight (`sum(sewage_share * weight) / sum(weight)`). Empty when no block data is cached. |
-| `nodes` | array | One object per UTC day (that day's last valid census sample), oldest first: `{ts, rated_good, plumb, knots_filter, share}`. `rated_good` is the rated-good node count (same basis as `policy-history.json`), `plumb` those whose user agent contains "plumb" (case-insensitive), `knots_filter` official Knots at or above `filter_min_knots` (not counted twice), and `share` = `(plumb + knots_filter) / rated_good`, 0..1. Samples whose `versions` counts do not sum to the rated-good total are skipped. |
+| `last24h` | object or null | `{blocks, share}`: rolling last 24 hours, `share` 0..1. Separate from `days`, which holds complete UTC days only. |
+| `first_partial` | boolean | True when the first entry of `days` is a partial day (the block data starts after 01:00 UTC of it). |
+| `small_below` | number | Census days with fewer rated-good nodes than this, from the start of the census, are drawn hatched as a small sample. |
+| `groups` | array | Version bands in stacking order: up to five official versions (`"29.4.1"`, oldest first; a final release or one that reached 2 % of a day's nodes, newest five kept), then `"Plumb"` (user agent contains "plumb", case-insensitive, tested first) and `"other"` (everything else, including older versions). Release candidates count under their version. Empty when no block data is cached. |
+| `days` | array | One object per UTC day, oldest first, no gaps in the dates: `{d, w, m, n, s, c}`. `d` is `YYYY-MM-DD`. `w` is the sewage share of block weight in percent, one decimal, weighted by block weight (`sum(sewage_share * weight) / sum(weight)`); `m` the plain per-block mean in percent; `n` the number of graded blocks (not a fixed ~144). `w` and `m` are absent when `n` is 0. `s` is the share of that day's rated-good nodes in each of `groups` (same order, percent, one decimal, sums to 100.0) from the day's last valid census sample; `c` is that sample's rated-good node count. `s` and `c` are absent for days without a census sample (samples whose `versions` counts do not sum to the rated-good total are skipped). The UTC day of the newest block is partial and never listed. |
+| `releases` | array | `{v, d}`: the UTC day `d` a final official Knots build of version `v` (`/Satoshi:X.Y.Z/Knots:DATE/`) was first seen by the census, from `releases.json`, oldest first. Release candidates, Plumb and renamed builds are not included, and neither are builds already running when the census began. Only days inside `days`. |
+| `eras` | array | One object per stretch of `days` that starts on a `releases` day (plus the stretch before the first one): `{name, start, end, w, m, n}` with `name` `"before 29.4.2"` or the version, `start`/`end` inclusive dates, `w` the block-weight-weighted spam share in percent over every block of the era, `m` the plain per-block mean, `n` the blocks. |
 
-The two series are not linked: nodes that relay with filters do not decide what miners put in blocks, so this file says nothing about cause and effect. Treat every value as untrusted input when consuming it.
+The spam share and the node versions are not linked: the versions are those of all rated-good nodes, not of the miners' nodes, so this file says nothing about cause and effect. Treat every value as untrusted input when consuming it.
 
 ### stable-nodes.json
 
