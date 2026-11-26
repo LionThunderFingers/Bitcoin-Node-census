@@ -24,10 +24,10 @@ clone of this repo, so a push here cannot change what runs on the host.
 - `seed-publish` turns the newest census line and the whole series into `data.json`, `history.json`,
   `policy-history.json`, `releases.json`, `spam-share.json`, `seeds.txt` and `stable-nodes.json`, and
   pushes them with a repo-scoped deploy key. `spam-share.json` comes from `gen_spam_share.py`, which
-  reads the cesspool cache (`CESSPOOL_CACHE`, default `/var/lib/census-cesspool`, read-only) and
-  `census.jsonl`. It never fails the publish: a generator failure keeps the previous file; a
+  reads the cesspool cache (`CESSPOOL_CACHE`, default `/var/lib/census-cesspool`, read-only),
+  `census.jsonl` and the `releases.json` generated just before it. It never fails the publish: a generator failure keeps the previous file; a
   missing or unreadable cache (no readable `state.json`) keeps the previous file, or on the very
-  first publish writes one with `blocks: []`; a stale but present cache regenerates from the stale
+  first publish writes one with `days: []`; a stale but present cache regenerates from the stale
   data (the panel shows its latest block).
 - `policy_model.py`, `gen_releases.py`, `gen_policy_history.py`, `gen_spam_share.py` are the shared Python that
   `seed-publish` imports (`seed-publish --self-test` runs their checks, and also
@@ -65,4 +65,4 @@ systemctl daemon-reload && systemctl start cesspool-fetch   # once, then check `
 systemctl enable --now cesspool-fetch.timer
 ```
 
-Run the fetcher once and check its output before installing the new `seed-publish`; otherwise the first publish commits `blocks: []` to the public file.
+Run the fetcher once and check its output before installing the new `seed-publish`; otherwise the first publish commits `days: []` to the public file.
