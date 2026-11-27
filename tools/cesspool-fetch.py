@@ -2,12 +2,17 @@
 """Fetch cesspool.lol per-block grade files into a validated, sanitised cache.
 
 Runs unprivileged (system user census-fetch) and writes only the cache directory. Per block it
-keeps five numeric/hex fields and nothing else; no text from cesspool reaches the cache, except
-grader_version after it matches a strict pattern. Cache layout:
-  CACHE/<n>.json   {"from", "to", "fetched", "blocks": [{height, hash, time, sewage_share, weight}]}
+keeps five numeric/hex fields, plus `sewage_by_type` when present and valid, and nothing else; no
+free text from cesspool reaches the cache, except grader_version after it matches a strict
+pattern. `sewage_by_type` is {type id: integer weight}: at most 32 entries, ids matching
+[a-z0-9_]{1,40}, values ints (not bool) 0..4,000,000, sum <= the block's weight. An invalid map
+drops that key only (the block stays); an absent map caches the block as before. Cache layout:
+  CACHE/<n>.json   {"from", "to", "fetched", "blocks": [{height, hash, time, sewage_share, weight
+                    [, sewage_by_type]}]}
   CACHE/state.json {"grader_version", "last_full_refresh", "tip_height"}
 Normal hourly run = 2 requests (tip + newest batch). Every batch is re-read when grader_version
-changes and once every 24 h. A full refresh writes nothing until every file has downloaded and
+changes and once every 24 h (so history gains `sewage_by_type` by itself after the API starts
+serving it). A full refresh writes nothing until every file has downloaded and
 validated. Requests are spaced 2.5 s apart. Exit 0 on success, 1 on any failure (cache untouched).
 
 Run: `python3 cesspool-fetch.py [--cache DIR]` (default /var/lib/census-cesspool).
@@ -33,18 +38,37 @@ DEFAULT_CACHE = "/var/lib/census-cesspool"
 MAX_INVALID_FRAC = 0.10   # more invalid blocks than this in a non-empty batch = schema drift
 MIN_BLOCK_TIME = 1231006505  # genesis block
 KEYS = ("height", "hash", "time", "sewage_share", "weight")
+TYPE_KEY = "sewage_by_type"
+MAX_TYPES = 32
 
 _HASH = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"[A-Za-z0-9.+_-]{1,64}")
+_TYPE_ID = re.compile(r"[a-z0-9_]{1,40}")
 
 
 def _is_int(v):
     return isinstance(v, int) and not isinstance(v, bool)
 
 
+def validate_type_map(m, weight):
+    """A copy of the sewage_by_type map, or None if it is not exactly what the API promises."""
+    if not isinstance(m, dict) or len(m) > MAX_TYPES:
+        return None
+    total = 0
+    for k, v in m.items():
+        if not isinstance(k, str) or not _TYPE_ID.fullmatch(k):
+            return None
+        if not _is_int(v) or not (0 <= v <= 4000000):
+            return None
+        total += v
+    if total > weight:
+        return None
+    return dict(m)
+
+
 def validate_block(obj, lo, hi, now=None):
-    """The five kept fields of a block, or None if anything is off. Extra keys are dropped.
-    `time` must lie in [genesis, now + 2 h]."""
+    """The kept fields of a block, or None if anything is off. Extra keys are dropped, except a
+    valid `sewage_by_type` (an invalid one is dropped alone). `time` must lie in [genesis, now + 2 h]."""
     if now is None:
         now = time.time()
     if not isinstance(obj, dict):
@@ -63,7 +87,12 @@ def validate_block(obj, lo, hi, now=None):
         return None
     if not _is_int(w) or not (1 <= w <= 4000000):
         return None
-    return {"height": h, "hash": hsh, "time": t, "sewage_share": float(share), "weight": w}
+    out = {"height": h, "hash": hsh, "time": t, "sewage_share": float(share), "weight": w}
+    if TYPE_KEY in obj:
+        m = validate_type_map(obj[TYPE_KEY], w)
+        if m is not None:
+            out[TYPE_KEY] = m
+    return out
 
 
 def _load(raw):
@@ -264,6 +293,40 @@ def _run_self_test():
         check("parse_batch keeps no text", bool(got) and "<img" not in json.dumps(got)
               and "javascript" not in json.dumps(got))
 
+    def test_type_map():
+        lo, hi = 1000, 1999
+        good = {"fake_multisig": 1000, "padded_fake_multisig": 3000}
+        v = validate_block(blk(1500, sewage_by_type=good), lo, hi)
+        check("valid map kept", v is not None and v.get("sewage_by_type") == good
+              and sorted(v) == sorted(KEYS + (TYPE_KEY,)))
+        check("empty map kept", validate_block(blk(1500, sewage_by_type={}), lo, hi)["sewage_by_type"] == {})
+        check("absent map: five keys", sorted(validate_block(blk(1500), lo, hi)) == sorted(KEYS))
+        bad = [("not a dict", [1]), ("null", None), ("string", "x"),
+               ("33 entries", {"t%d" % i: 1 for i in range(33)}),
+               ("uppercase key", {"Inscription": 1}), ("space key", {"a b": 1}),
+               ("empty key", {"": 1}), ("41-char key", {"a" * 41: 1}),
+               ("newline key", {"abc\n": 1}), ("dash key", {"a-b": 1}),
+               ("float value", {"a": 1.0}), ("string value", {"a": "1"}), ("bool value", {"a": True}),
+               ("negative value", {"a": -1}), ("value > 4M", {"a": 4000001}),
+               ("sum > weight", {"a": 2000000, "b": 1990001}), ("null value", {"a": None})]
+        for label, m in bad:
+            v = validate_block(blk(1500, sewage_by_type=m), lo, hi)
+            check("invalid map (%s): key dropped, block kept" % label,
+                  v is not None and TYPE_KEY not in v and sorted(v) == sorted(KEYS))
+        check("32 entries ok", TYPE_KEY in validate_block(
+            blk(1500, sewage_by_type={"t%d" % i: 1 for i in range(32)}), lo, hi))
+        check("40-char key ok", TYPE_KEY in validate_block(blk(1500, sewage_by_type={"a" * 40: 1}), lo, hi))
+        check("sum == weight ok", TYPE_KEY in validate_block(
+            blk(1500, sewage_by_type={"a": 2000000, "b": 1990000}), lo, hi))
+        leak = blk(1500, sewage_by_type=good, evil="<img>", url="javascript:x", grade_label="x")
+        v = validate_block(leak, lo, hi)
+        check("no other key leaks", sorted(v) == sorted(KEYS + (TYPE_KEY,)))
+        raw = json.dumps({"from": 1000, "to": 1999, "blocks": [blk(1500, sewage_by_type=good)]}).encode()
+        check("parse_batch keeps map", parse_batch(raw, 1)[0]["sewage_by_type"] == good)
+        raw = json.dumps({"from": 1000, "to": 1999,
+                          "blocks": [blk(1500, sewage_by_type={"A": 1})]}).encode()
+        check("parse_batch: bad map is not a bad block", len(parse_batch(raw, 1)) == 1)
+
     def make_opener(table, log):
         def opener(url):
             log.append(url)
@@ -441,7 +504,7 @@ def _run_self_test():
         finally:
             srv.shutdown()
 
-    for t in (test_block_validation, test_only_numeric_fields_cached, test_bad_responses_leave_cache,
+    for t in (test_block_validation, test_type_map, test_only_numeric_fields_cached, test_bad_responses_leave_cache,
               test_hourly_run_two_requests, test_regrade_refetches_all, test_daily_refresh,
               test_new_batch_rereads_previous, test_schema_drift_fails_run, test_no_redirects):
         try:
