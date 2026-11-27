@@ -4,7 +4,7 @@
 Runs unprivileged (system user census-fetch) and writes only the cache directory. Per block it
 keeps five numeric/hex fields, plus `sewage_by_type` when present and valid, and nothing else; no
 free text from cesspool reaches the cache, except grader_version after it matches a strict
-pattern. `sewage_by_type` is {type id: integer weight}: at most 32 entries, ids matching
+pattern. `sewage_by_type` is {type id: integer weight}: at most 64 entries, ids matching
 [a-z0-9_-]{1,40}, values ints (not bool) 0..4,000,000, sum <= the block's weight. An invalid map
 drops that key only (the block stays); an absent map caches the block as before. Cache layout:
   CACHE/<n>.json   {"from", "to", "fetched", "blocks": [{height, hash, time, sewage_share, weight
@@ -39,7 +39,7 @@ MAX_INVALID_FRAC = 0.10   # more invalid blocks than this in a non-empty batch =
 MIN_BLOCK_TIME = 1231006505  # genesis block
 KEYS = ("height", "hash", "time", "sewage_share", "weight")
 TYPE_KEY = "sewage_by_type"
-MAX_TYPES = 32
+MAX_TYPES = 64  # cesspool has 43 type ids plus "unknown"
 
 _HASH = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"[A-Za-z0-9.+_-]{1,64}")
@@ -302,7 +302,7 @@ def _run_self_test():
         check("empty map kept", validate_block(blk(1500, sewage_by_type={}), lo, hi)["sewage_by_type"] == {})
         check("absent map: five keys", sorted(validate_block(blk(1500), lo, hi)) == sorted(KEYS))
         bad = [("not a dict", [1]), ("null", None), ("string", "x"),
-               ("33 entries", {"t%d" % i: 1 for i in range(33)}),
+               ("65 entries", {"t%d" % i: 1 for i in range(65)}),
                ("uppercase key", {"Inscription": 1}), ("space key", {"a b": 1}),
                ("empty key", {"": 1}), ("41-char key", {"a" * 41: 1}),
                ("newline key", {"abc\n": 1}),
@@ -313,8 +313,8 @@ def _run_self_test():
             v = validate_block(blk(1500, sewage_by_type=m), lo, hi)
             check("invalid map (%s): key dropped, block kept" % label,
                   v is not None and TYPE_KEY not in v and sorted(v) == sorted(KEYS))
-        check("32 entries ok", TYPE_KEY in validate_block(
-            blk(1500, sewage_by_type={"t%d" % i: 1 for i in range(32)}), lo, hi))
+        check("64 entries ok", TYPE_KEY in validate_block(
+            blk(1500, sewage_by_type={"t%d" % i: 1 for i in range(64)}), lo, hi))
         check("40-char key ok", TYPE_KEY in validate_block(blk(1500, sewage_by_type={"a" * 40: 1}), lo, hi))
         real = ("babylon bare-envelope bare-inscription bare-multisig bip47 cat21 commitment coredao "
                 "counterparty dead-branch dust-sweep envelope fake-hash fake-multisig fake-multisig-equal "
@@ -325,7 +325,7 @@ def _run_self_test():
                 "witness-items unknown").split()
         check("all 43 real hyphenated ids + unknown kept",
               len(real) == 44 and validate_block(
-                  blk(1500, sewage_by_type={k: 1 for k in real[:32]}), lo, hi).get(TYPE_KEY) is not None
+                  blk(1500, sewage_by_type={k: 1 for k in real}), lo, hi).get(TYPE_KEY) is not None
               and all(validate_block(blk(1500, sewage_by_type={k: 10}), lo, hi).get(TYPE_KEY) == {k: 10}
                       for k in real))
         check("fake-multisig-padded kept", validate_block(

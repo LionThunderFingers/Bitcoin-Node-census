@@ -88,7 +88,7 @@ def _valid_block(obj, lo, hi):
 def _valid_type_map(m, weight):
     """sewage_by_type ({type id: integer weight}) re-validated like tools/cesspool-fetch.py does,
     or None (the block is still used, just without a type split)."""
-    if not isinstance(m, dict) or len(m) > 32:
+    if not isinstance(m, dict) or len(m) > 64:
         return None
     total = 0
     for k, v in m.items():
