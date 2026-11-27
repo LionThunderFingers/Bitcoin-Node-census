@@ -1167,7 +1167,8 @@ let SPAM_SERIES = null;   // {days, groups, markers, eras, grader, last24, btime
 const SS_NS = "http://www.w3.org/2000/svg";
 const SS_BLUES = ["var(--ss-v1)", "var(--ss-v2)", "var(--ss-v3)", "var(--ss-v4)", "var(--ss-v5)"];
 const SS_GROUP = /^(?:[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|Plumb|other)$/;
-const SS_ERA = /^(?:all days|(?:before )?[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$/;
+const SS_TYPE = /^[a-z0-9_]{1,40}$/;
+const SS_ERA =/^(?:all days|(?:before )?[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$/;
 const SS_STYLE = {
   halo: "paint-order:stroke;stroke:var(--surface);stroke-width:3px",
   era: "fill:var(--text);font-size:10.5px;font-weight:600;paint-order:stroke;stroke:var(--surface);stroke-width:3px"
@@ -1188,6 +1189,7 @@ const ssIso = n => new Date(n * 864e5).toISOString().slice(0, 10);
 const ssLabel = s => MONTHS[+s.slice(5, 7) - 1] + " " + (+s.slice(8));
 const ssP1 = v => v.toFixed(1);
 const ssGroupLabel = g => g === "other" ? "other (renamed builds)" : g;
+const ssTypeLabel = g => g === "other" ? "other types" : g.replace(/_/g, " ");
 
 function renderSpamShare(d) {
   const sec = $("spamShareSection");
@@ -1199,6 +1201,16 @@ function renderSpamShare(d) {
   let groups = Array.isArray(d.groups) ? d.groups.slice(0, 9) : [];
   if (!groups.length || groups.length > 8 || groups.some(g => typeof g !== "string" || !SS_GROUP.test(g)) ||
       new Set(groups).size !== groups.length) groups = [];
+
+  // Spam types (optional): up to 8 ids, drawn as stacked areas under the daily spam line.
+  let types = Array.isArray(d.types) ? d.types.slice(0, 9) : [];
+  if (!types.length || types.length > 8 || types.some(g => typeof g !== "string" || !SS_TYPE.test(g)) ||
+      new Set(types).size !== types.length) types = [];
+  const tArr = v => {
+    if (!types.length || !Array.isArray(v) || v.length !== types.length) return null;
+    const a = v.map(pct);
+    return a.every(x => x !== null) ? a : null;
+  };
 
   // Days: validated, then made dense (one entry per calendar day, null for a missing value)
   // because the x axis is position in this list.
@@ -1216,14 +1228,14 @@ function renderSpamShare(d) {
     }
     const c = numOr(r.c, null);
     rows.set(dn, { w: n > 0 ? w : null, m: n > 0 ? m : null, n: n > 0 ? n : 0, s,
-                   c: s && c !== null && c > 0 ? c : null });
+                   c: s && c !== null && c > 0 ? c : null, t: n > 0 && w !== null ? tArr(r.t) : null });
   }
   const keys = [...rows.keys()].sort((a, b) => a - b);
   const days = [];
   if (groups.length && keys.length && keys[keys.length - 1] - keys[0] < 3000) {
     for (let k = keys[0]; k <= keys[keys.length - 1]; k++) {
-      const r = rows.get(k) || { w: null, m: null, n: 0, s: null, c: null };
-      days.push({ date: ssIso(k), w: r.w, m: r.m, n: r.n, s: r.s, c: r.c });
+      const r = rows.get(k) || { w: null, m: null, n: 0, s: null, c: null, t: null };
+      days.push({ date: ssIso(k), w: r.w, m: r.m, n: r.n, s: r.s, c: r.c, t: r.t });
     }
   }
   const haveChart = days.filter(x => x.w !== null).length >= 2;
@@ -1255,6 +1267,24 @@ function renderSpamShare(d) {
       smallMin = Math.min(...cs); smallMax = Math.max(...cs);
     }
   }
+  // Type split only when some day has it. A type is "new" when the earlier days with a split
+  // (at least 8) never showed it above 0.05% and one of the last 7 days shows it at 0.5% or more:
+  // a type nobody has seen before, or an `unknown` jump, is the first sign of a new spam method.
+  const haveTypes = haveChart && days.some(x => x.t);
+  const newTypes = [];
+  if (haveTypes) {
+    const ti = days.map((x, i) => x.t ? i : -1).filter(i => i >= 0);
+    const edge = ti[ti.length - 1] - 7;
+    const base = ti.filter(i => i <= edge), recent = ti.filter(i => i > edge);
+    if (base.length >= 8) {
+      types.forEach((g, gi) => {
+        if (g === "other") return;
+        if (Math.max(...base.map(i => days[i].t[gi])) < 0.05 && Math.max(...recent.map(i => days[i].t[gi])) >= 0.5) newTypes.push(g);
+      });
+    }
+  }
+  let last24t = null;
+  if (haveTypes && obj(d.last24h)) last24t = tArr(d.last24h.t);
   const gv = typeof d.grader_version === "string" && /^[A-Za-z0-9.+_-]{1,64}$/.test(d.grader_version)
     ? d.grader_version : null;
   const lb = obj(d.latest_block) ? d.latest_block : null;
@@ -1262,6 +1292,7 @@ function renderSpamShare(d) {
   const btime = lb ? numOr(lb.time, null) : null;
   SPAM_SERIES = {
     days, idx, groups: haveChart ? groups : [], markers, eras, haveChart,
+    types: haveTypes ? types : [], newTypes, last24t,
     grader: gv, last24: obj(d.last24h) ? frac(d.last24h.share) : null,
     btime: btime !== null && btime > 0 ? btime : null,
     height: height !== null && height > 0 ? Math.floor(height) : null,
@@ -1286,10 +1317,27 @@ function ssSwatch(S, g) {
   if (g === "other") s.appendChild(ssSvg("path", { d: "M0 11L11 0M5 11L16 0", stroke: "var(--surface)", "stroke-width": 1.5 }));
   return s;
 }
+function ssTypeColour(S, g) {
+  if (g === "unknown") return "var(--ss-unknown)";
+  if (g === "other") return "var(--ss-tother)";
+  const named = S.types.filter(x => x !== "unknown" && x !== "other");
+  return "var(--ss-t" + (1 + Math.min(5, named.indexOf(g))) + ")";
+}
+function ssTypeSwatch(S, g) {
+  const col = ssTypeColour(S, g);
+  const s = ssSvg("svg", { width: 16, height: 12, "aria-hidden": "true" });
+  s.appendChild(ssSvg("rect", { x: 0, y: 1, width: 16, height: 10, fill: col }));
+  if (g === "other") s.appendChild(ssSvg("path", { d: "M0 11L11 0M5 11L16 0", stroke: "var(--surface)", "stroke-width": 1.5 }));
+  return s;
+}
 function ssLegend(S) {
   const items = [];
   const add = (svg, text) => items.push(el("li", null, svg, el("span", null, text)));
   for (const g of S.groups) add(ssSwatch(S, g), ssGroupLabel(g));
+  for (const g of S.types) {
+    add(ssTypeSwatch(S, g), "spam: " + ssTypeLabel(g) + (S.newTypes.includes(g) ? " (new)" : ""));
+    if (S.newTypes.includes(g)) items[items.length - 1].classList.add("ss-unk");
+  }
   let s = ssSvg("svg", { width: 18, height: 12, "aria-hidden": "true" });
   s.appendChild(ssSvg("line", { x1: 0, x2: 18, y1: 6, y2: 6, stroke: "var(--beacon)", "stroke-width": 2.5, "stroke-linecap": "round" }));
   add(s, "Spam share of block weight (daily, weighted)");
@@ -1337,7 +1385,8 @@ function drawSpamChart() {
   const halo = SS_STYLE.halo;
 
   const svg = ssSvg("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img",
-    "aria-label": "Daily spam share of block weight, with each era's average, above stacked node version shares, " +
+    "aria-label": "Daily spam share of block weight" + (S.types.length ? " split by spam type" : "") +
+      ", with each era's average, above stacked node version shares, " +
       days[0].date + " to " + days[N - 1].date });
   const defs = ssSvg("defs");
   const pat = ssSvg("pattern", { id: "ssHatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
@@ -1423,6 +1472,46 @@ function drawSpamChart() {
     svg.appendChild(ssSvg("line", { x1: hx1, x2: hx1, y1: bot.y, y2: bot.y + bot.h, stroke: "var(--surface)", "stroke-width": 1.5 }));
   }
 
+  // spam share split by type: stacked areas under the spam line (same total height), one run per
+  // stretch of days that have a split; days without one keep the plain line
+  if (S.types.length) {
+    const tr = [];
+    days.forEach((x, i) => {
+      if (!x.t) return;
+      const r = tr[tr.length - 1];
+      if (r && r.b === i - 1) r.b = i; else tr.push({ a: i, b: i });
+    });
+    // the per-type values are rounded; scale so the stack ends exactly on the line when it is that close
+    const kk = days.map(x => {
+      if (!x.t) return 1;
+      const sum = x.t.reduce((p, q) => p + q, 0);
+      return sum > 0 && Math.abs(sum - x.w) <= 0.5 ? x.w / sum : 1;
+    });
+    const gT = ssSvg("g");
+    const tc = days.map(() => 0);
+    S.types.forEach((g, gi) => {
+      for (const r of tr) {
+        const tp = [], bt = [];
+        const half = r.a === r.b ? step / 2 : 0;
+        for (let i = r.a; i <= r.b; i++) {
+          const b0 = tc[i]; tc[i] = b0 + days[i].t[gi] * kk[i];
+          const xa = X(i) - (i === r.a ? half : 0), xb = X(i) + (i === r.b ? half : 0);
+          tp.push([xa, Ys(Math.min(tc[i], ymax))], [xb, Ys(Math.min(tc[i], ymax))]);
+          bt.push([xa, Ys(Math.min(b0, ymax))], [xb, Ys(Math.min(b0, ymax))]);
+        }
+        const pts = p => p[0].toFixed(1) + " " + p[1].toFixed(1);
+        const dpath = "M" + tp.map(pts).join("L") + "L" + bt.reverse().map(pts).join("L") + "Z";
+        const col = ssTypeColour(S, g);
+        const a = ssSvg("path", { d: dpath, fill: col, stroke: col, "stroke-width": 0.6, "stroke-linejoin": "round",
+          "fill-opacity": 0.9 });
+        a.appendChild(ssSvg("title", null, "spam: " + ssTypeLabel(g)));
+        gT.appendChild(a);
+        if (g === "other") gT.appendChild(ssSvg("path", { d: dpath, fill: "url(#ssHatchO)", stroke: "none" }));
+      }
+    });
+    svg.appendChild(gT);
+  }
+
   // era step lines with their weighted average
   for (const e of S.eras) {
     const a = S.idx[e.start], b = S.idx[e.end], y = Ys(e.w);
@@ -1499,7 +1588,11 @@ function drawSpamChart() {
   if (S.groups.includes("Plumb")) bits.push("Plumb (violet) peaks at " + pm.toFixed(1) + "% of nodes");
   if (S.groups.includes("other")) bits.push((bits.length ? "other (hatched grey)" : "Other (hatched grey)") + " at " + om.toFixed(1) + "%");
   const thin = pm < 10 && om < 10 && bits.length;
-  $("ssHint").textContent = (bits.length ? bits.join(" and ") + (thin
+  const tnote = !S.types.length ? "" :
+    "Spam is split by type where cesspool.lol names it; unknown (red) is spam it has no type for, so a jump there, or a type that was never seen before, is the first sign of a new spam method." +
+    (S.newTypes.length ? " New in the last 7 days: " + S.newTypes.map(ssTypeLabel).join(", ") + "." : "") +
+    " Days without a split show the plain line. ";
+  $("ssHint").textContent = tnote + (bits.length ?bits.join(" and ") + (thin
     ? ", so both are thin bands at the very top of the stack, drawn with their own colour outline. "
     : ". ") : "") + "Exact values are in the readout." +
     (S.firstS > 0 ? " No version data before " + days[S.firstS].date + "." : "");
@@ -1535,7 +1628,22 @@ function ssReadout(S, d, i) {
     ul.append(el("li", null, ssSwatch(S, g), el("b", null, v === null ? "no data" : ssP1(v) + "%"),
       el("i", null, g)));
   });
-  $("ssReadout").replaceChildren(hd, sp, ul);
+  const parts = [hd, sp];
+  if (S.types.length) {
+    if (d.w !== null && !d.t) {
+      parts.push(el("div", { class: "tt" }, "No spam-type split for this day (not every block carried one)."));
+    } else if (d.t) {
+      const tl = el("ul");
+      S.types.forEach((g, gi) => {
+        tl.append(el("li", { class: g === "unknown" ? "unk" : "" }, ssTypeSwatch(S, g), el("b", null, ssP1(d.t[gi]) + "%"),
+          el("i", null, ssTypeLabel(g) + (S.newTypes.includes(g) ? " (new)" : ""))));
+      });
+      parts.push(el("div", { class: "tt" }, "Spam share by type, percent of the day's block weight"), tl,
+        el("div", { class: "tt" }, "Node versions"));
+    }
+  }
+  parts.push(ul);
+  $("ssReadout").replaceChildren(...parts);
 }
 
 function ssEraTable(S) {
@@ -1582,7 +1690,17 @@ function drawSpamHeadline(S) {
   }
   const lastDay = S.haveChart ? [...S.days].reverse().find(x => x.w !== null) : null;
   if (lastDay) head += " · whole day " + ssLabel(lastDay.date) + ": " + ssP1(lastDay.w) + "%";
-  $("ssNow").replaceChildren(head, src);
+  const nodes = [head, src];
+  if (S.haveChart && S.types.length && S.last24t) {
+    const line = el("span", { class: "ss-src" }, "Last 24 h by type: ");
+    S.types.forEach((g, gi) => {
+      if (gi) line.append(" · ");
+      const part = el("span", { class: g === "unknown" ? "ss-unk" : "" }, ssTypeLabel(g) + " " + ssP1(S.last24t[gi]) + "%");
+      line.append(part);
+    });
+    nodes.push(line);
+  }
+  $("ssNow").replaceChildren(...nodes);
 }
 
 let redrawPending = false;

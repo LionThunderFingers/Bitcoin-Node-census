@@ -20,6 +20,8 @@
   --vp-rc:#1baf7a; --vp-plumb:#404B49; --vp-older:#B4C0BD; --vp-other:#6E817D;
   --ss-v1:#cfe0f5; --ss-v2:#9dbfe9; --ss-v3:#6a9dd9; --ss-v4:#3f78bf; --ss-v5:#1f4f8c;
   --ss-plumb:#6250d6; --ss-other:#7d8f8b;
+  --ss-unknown:#D81B4A; --ss-tother:#B4C0BD;
+  --ss-t1:#2F6D68; --ss-t2:#7B5EA7; --ss-t3:#5E8C3A; --ss-t4:#8C6D4F; --ss-t5:#3F7FB5; --ss-t6:#A0A04A;
   --sans:"Helvetica Neue",Helvetica,Arial,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   --cond:"Helvetica Neue",Helvetica,Arial,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
@@ -35,6 +37,8 @@
     --vp-rc:#199e70; --vp-plumb:#B9C6C3; --vp-older:#44524F; --vp-other:#7E918C;
     --ss-v1:#1d3d66; --ss-v2:#245891; --ss-v3:#3174c4; --ss-v4:#5b9be6; --ss-v5:#a6c9f4;
     --ss-plumb:#9d93ee; --ss-other:#8da09c;
+    --ss-unknown:#FF5C7A; --ss-tother:#44524F;
+    --ss-t1:#57A9A2; --ss-t2:#A68FD6; --ss-t3:#8CBF63; --ss-t4:#BFA07F; --ss-t5:#6FA8DC; --ss-t6:#CFCF7A;
   }
 }
 :root[data-theme="dark"]{
@@ -48,6 +52,8 @@
   --vp-rc:#199e70; --vp-plumb:#B9C6C3; --vp-older:#44524F; --vp-other:#7E918C;
   --ss-v1:#1d3d66; --ss-v2:#245891; --ss-v3:#3174c4; --ss-v4:#5b9be6; --ss-v5:#a6c9f4;
   --ss-plumb:#9d93ee; --ss-other:#8da09c;
+  --ss-unknown:#FF5C7A; --ss-tother:#44524F;
+  --ss-t1:#57A9A2; --ss-t2:#A68FD6; --ss-t3:#8CBF63; --ss-t4:#BFA07F; --ss-t5:#6FA8DC; --ss-t6:#CFCF7A;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
@@ -169,6 +175,9 @@ footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--line-soft);
 .ss-readout li{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
 .ss-readout li b{font-weight:600}
 .ss-readout li i{font-style:normal;color:var(--text-2)}
+.ss-readout .tt{margin:8px 0 4px;color:var(--text-3);font-size:12px}
+.ss-readout .unk b,.ss-unk{color:var(--ss-unknown)}
+.ss-readout .unk b{font-weight:700}
 .ss-hint{margin:8px 0 0;color:var(--text-3);font-size:12px}
 .ss-eras h3{font-family:var(--cond);font-size:15px;margin:22px 0 8px}
 .ss-eras .scroll table{min-width:520px;font-size:13.5px}
