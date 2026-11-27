@@ -1317,11 +1317,19 @@ function ssSwatch(S, g) {
   if (g === "other") s.appendChild(ssSvg("path", { d: "M0 11L11 0M5 11L16 0", stroke: "var(--surface)", "stroke-width": 1.5 }));
   return s;
 }
+// Spam type colours depend on the id only, never on rank: known ids are fixed, `unknown` is the
+// red, `other` the muted grey, any other id hashes (FNV-1a) into the same 7-colour palette.
+const SS_TYPE_FIXED = { inscription: 1, fake_multisig: 2, padded_fake_multisig: 3, op_return_stuffing: 4 };
 function ssTypeColour(S, g) {
   if (g === "unknown") return "var(--ss-unknown)";
   if (g === "other") return "var(--ss-tother)";
-  const named = S.types.filter(x => x !== "unknown" && x !== "other");
-  return "var(--ss-t" + (1 + Math.min(5, named.indexOf(g))) + ")";
+  let k = Object.prototype.hasOwnProperty.call(SS_TYPE_FIXED, g) ? SS_TYPE_FIXED[g] : 0;
+  if (!k) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < g.length; i++) { h ^= g.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    k = 1 + h % 7;
+  }
+  return "var(--ss-t" + k + ")";
 }
 function ssTypeSwatch(S, g) {
   const col = ssTypeColour(S, g);
@@ -1334,9 +1342,14 @@ function ssLegend(S) {
   const items = [];
   const add = (svg, text) => items.push(el("li", null, svg, el("span", null, text)));
   for (const g of S.groups) add(ssSwatch(S, g), ssGroupLabel(g));
-  for (const g of S.types) {
-    add(ssTypeSwatch(S, g), "spam: " + ssTypeLabel(g) + (S.newTypes.includes(g) ? " (new)" : ""));
-    if (S.newTypes.includes(g)) items[items.length - 1].classList.add("ss-unk");
+  if (S.types.length) {
+    items.push(el("li", { class: "brk", "aria-hidden": "true" }));
+    items.push(el("li", { class: "lbl" }, "spam by type:"));
+    for (const g of S.types) {
+      add(ssTypeSwatch(S, g), ssTypeLabel(g) + (S.newTypes.includes(g) ? " (new)" : ""));
+      if (S.newTypes.includes(g)) items[items.length - 1].classList.add("ss-unk");
+    }
+    items.push(el("li", { class: "brk", "aria-hidden": "true" }));
   }
   let s = ssSvg("svg", { width: 18, height: 12, "aria-hidden": "true" });
   s.appendChild(ssSvg("line", { x1: 0, x2: 18, y1: 6, y2: 6, stroke: "var(--beacon)", "stroke-width": 2.5, "stroke-linecap": "round" }));
@@ -1633,7 +1646,7 @@ function ssReadout(S, d, i) {
     if (d.w !== null && !d.t) {
       parts.push(el("div", { class: "tt" }, "No spam-type split for this day (not every block carried one)."));
     } else if (d.t) {
-      const tl = el("ul");
+      const tl = el("ul", { class: "ty" });
       S.types.forEach((g, gi) => {
         tl.append(el("li", { class: g === "unknown" ? "unk" : "" }, ssTypeSwatch(S, g), el("b", null, ssP1(d.t[gi]) + "%"),
           el("i", null, ssTypeLabel(g) + (S.newTypes.includes(g) ? " (new)" : ""))));
