@@ -47,7 +47,7 @@ SMALL_SAMPLE_NODES = 250  # census days with fewer rated-good nodes are drawn ha
 _MAX_BYTES = 2 * 1024 * 1024
 _HASH = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"[A-Za-z0-9.+_-]{1,64}")
-_TYPE_ID = re.compile(r"[a-z0-9_]{1,40}")
+_TYPE_ID = re.compile(r"[a-z0-9_-]{1,40}")
 MAX_TYPE_BANDS = 6        # spam types drawn as their own band; the rest fold into "other"
 _BATCH_NAME = re.compile(r"([0-9]{1,7})\.json")
 _PLUMB = re.compile(r"plumb", re.I)
@@ -793,6 +793,14 @@ def _run_self_test():
             check("spike type gets a band, ranked first", o6["types"][0], "spike")
             check("max 6 named + other", (len(o6["types"]), o6["types"][-1]), (7, "other"))
             check("spike share on its day", o6["days"][2]["t"][0], _pct(800 / 2000))
+            # real cesspool ids use hyphens
+            hy = [dict(b) for b in plain]
+            for b in hy:
+                b["sewage_by_type"] = {"fake-multisig-padded": 30, "fake-multisig": 20, "unknown": 5}
+            write_batch(d, 0, hy, lo=0, hi=999)
+            o7 = build(d, [])
+            check("hyphenated ids kept as bands", o7["types"], ["fake-multisig-padded", "fake-multisig", "unknown"])
+            check("hyphenated ids carry t", "t" in o7["days"][0], True)
         finally:
             shutil.rmtree(d)
 

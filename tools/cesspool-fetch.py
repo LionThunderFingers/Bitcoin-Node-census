@@ -5,7 +5,7 @@ Runs unprivileged (system user census-fetch) and writes only the cache directory
 keeps five numeric/hex fields, plus `sewage_by_type` when present and valid, and nothing else; no
 free text from cesspool reaches the cache, except grader_version after it matches a strict
 pattern. `sewage_by_type` is {type id: integer weight}: at most 32 entries, ids matching
-[a-z0-9_]{1,40}, values ints (not bool) 0..4,000,000, sum <= the block's weight. An invalid map
+[a-z0-9_-]{1,40}, values ints (not bool) 0..4,000,000, sum <= the block's weight. An invalid map
 drops that key only (the block stays); an absent map caches the block as before. Cache layout:
   CACHE/<n>.json   {"from", "to", "fetched", "blocks": [{height, hash, time, sewage_share, weight
                     [, sewage_by_type]}]}
@@ -43,7 +43,7 @@ MAX_TYPES = 32
 
 _HASH = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"[A-Za-z0-9.+_-]{1,64}")
-_TYPE_ID = re.compile(r"[a-z0-9_]{1,40}")
+_TYPE_ID = re.compile(r"[a-z0-9_-]{1,40}")
 
 
 def _is_int(v):
@@ -305,7 +305,7 @@ def _run_self_test():
                ("33 entries", {"t%d" % i: 1 for i in range(33)}),
                ("uppercase key", {"Inscription": 1}), ("space key", {"a b": 1}),
                ("empty key", {"": 1}), ("41-char key", {"a" * 41: 1}),
-               ("newline key", {"abc\n": 1}), ("dash key", {"a-b": 1}),
+               ("newline key", {"abc\n": 1}),
                ("float value", {"a": 1.0}), ("string value", {"a": "1"}), ("bool value", {"a": True}),
                ("negative value", {"a": -1}), ("value > 4M", {"a": 4000001}),
                ("sum > weight", {"a": 2000000, "b": 1990001}), ("null value", {"a": None})]
@@ -316,6 +316,22 @@ def _run_self_test():
         check("32 entries ok", TYPE_KEY in validate_block(
             blk(1500, sewage_by_type={"t%d" % i: 1 for i in range(32)}), lo, hi))
         check("40-char key ok", TYPE_KEY in validate_block(blk(1500, sewage_by_type={"a" * 40: 1}), lo, hi))
+        real = ("babylon bare-envelope bare-inscription bare-multisig bip47 cat21 commitment coredao "
+                "counterparty dead-branch dust-sweep envelope fake-hash fake-multisig fake-multisig-equal "
+                "fake-multisig-padded fake-output inscription liquid-emergency ln-anchor-sweep olga "
+                "olga-acme olga-untagged omni opreturn-data opreturn-empty opreturn-text p2a-sweep "
+                "p2wsh-data p2wsh-run powpeg-flyover runes runes-empty self-pay stacks swap-memo "
+                "swap-memo-hash taproot-data taproot-offcurve taproot-text token-json witness-data "
+                "witness-items unknown").split()
+        check("all 43 real hyphenated ids + unknown kept",
+              len(real) == 44 and validate_block(
+                  blk(1500, sewage_by_type={k: 1 for k in real[:32]}), lo, hi).get(TYPE_KEY) is not None
+              and all(validate_block(blk(1500, sewage_by_type={k: 10}), lo, hi).get(TYPE_KEY) == {k: 10}
+                      for k in real))
+        check("fake-multisig-padded kept", validate_block(
+            blk(1500, sewage_by_type={"fake-multisig-padded": 5}), lo, hi)[TYPE_KEY] == {"fake-multisig-padded": 5})
+        check("dash and underscore both valid", TYPE_KEY in validate_block(
+            blk(1500, sewage_by_type={"a-b": 1, "c_d": 2}), lo, hi))
         check("sum == weight ok", TYPE_KEY in validate_block(
             blk(1500, sewage_by_type={"a": 2000000, "b": 1990000}), lo, hi))
         leak = blk(1500, sewage_by_type=good, evil="<img>", url="javascript:x", grade_label="x")
