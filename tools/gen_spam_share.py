@@ -16,8 +16,15 @@ The partial UTC day of the newest block is never a daily point; `last24h` is its
 Every time reference is the newest block's time, never the wall clock, so the same inputs
 always give the same output. The cache is treated as untrusted input and re-validated here.
 
+Spam by type (additive): when cached blocks carry cesspool's `sewage_by_type` map ({type id:
+sewage weight}), a day with EVERY block mapped gets `t`: each type's share of that day's whole
+block weight in percent, in the order of the top-level `types` (up to 6 types by total weight,
+`unknown` always kept when present, the rest folded into "other", last). A day with any
+unmapped block has no `t` (partial coverage would understate). `last24h.t` works the same way.
+Without any maps `types` is [] and no `t` appears.
+
 Output (stdout): {source, grader_version, latest_block, last24h, first_partial, small_below,
-groups, days, releases, eras}. A missing or empty cache is not an error (days: []); an
+groups, types, days, releases, eras}. A missing or empty cache is not an error (days: []); an
 unreadable census.jsonl exits non-zero; a missing or unreadable releases.json just means no
 release markers.
 
@@ -40,7 +47,9 @@ SMALL_SAMPLE_NODES = 250  # census days with fewer rated-good nodes are drawn ha
 _MAX_BYTES = 2 * 1024 * 1024
 _HASH = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"[A-Za-z0-9.+_-]{1,64}")
-_BATCH_NAME = re.compile(r"([0-9]{1,7})\.json")
+_TYPE_ID = re.compile(r"[a-z0-9_]{1,40}")
+MAX_TYPE_BANDS = 6        # spam types drawn as their own band; the rest fold into "other"
+_BATCH_NAME =re.compile(r"([0-9]{1,7})\.json")
 _PLUMB = re.compile(r"plumb", re.I)
 # first version-looking token (two-digit major, so dates like 11.16.2026 never match)
 _UA_VERSION = re.compile(r"[:]([0-9]{2}\.[0-9]{1,2}\.[0-9]{1,2})(?![0-9])")
@@ -68,7 +77,27 @@ def _valid_block(obj, lo, hi):
         return None
     if not _is_int(w) or not (1 <= w <= 4000000):
         return None
-    return {"height": h, "hash": hsh, "time": t, "sewage_share": float(share), "weight": w}
+    out = {"height": h, "hash": hsh, "time": t, "sewage_share": float(share), "weight": w}
+    if "sewage_by_type" in obj:
+        m = _valid_type_map(obj["sewage_by_type"], w)
+        if m is not None:
+            out["sewage_by_type"] = m
+    return out
+
+
+def _valid_type_map(m, weight):
+    """sewage_by_type ({type id: integer weight}) re-validated like tools/cesspool-fetch.py does,
+    or None (the block is still used, just without a type split)."""
+    if not isinstance(m, dict) or len(m) > 32:
+        return None
+    total = 0
+    for k, v in m.items():
+        if not isinstance(k, str) or not _TYPE_ID.fullmatch(k):
+            return None
+        if not _is_int(v) or not (0 <= v <= 4000000):
+            return None
+        total += v
+    return dict(m) if total <= weight else None
 
 
 _MAX_FILES = 5000
@@ -176,13 +205,62 @@ def blocks_by_day(blocks):
     return days
 
 
+def _last_24h_blocks(blocks):
+    ref = _newest(blocks)["time"]
+    return [b for b in blocks if b["time"] >= ref - _DAY]
+
+
 def last_24h(blocks):
     """Weighted share of blocks with time >= newest_time - 86400, or None."""
     if not blocks:
         return None
-    ref = _newest(blocks)["time"]
-    win = [b for b in blocks if b["time"] >= ref - _DAY]
+    win = _last_24h_blocks(blocks)
     return {"blocks": len(win), "share": round(_weighted(win), 4)}
+
+
+def type_weights(blocks):
+    """{type id: summed sewage weight} over `blocks`, or None unless EVERY block carries a
+    sewage_by_type map (partial coverage would understate the shares)."""
+    tw = {}
+    for b in blocks:
+        m = b.get("sewage_by_type")
+        if m is None:
+            return None
+        for k, v in m.items():
+            tw[k] = tw.get(k, 0) + v
+    return tw
+
+
+def type_bands(weights):
+    """Band order for the type split from a list of {type: weight} dicts (one per fully covered
+    day): up to MAX_TYPE_BANDS types by total weight, largest first (ties by id), `unknown`
+    always included when it has any weight; the rest fold into "other", last, when used.
+    A real type literally called "other" is folded too."""
+    tot = {}
+    for tw in weights:
+        for k, v in tw.items():
+            tot[k] = tot.get(k, 0) + v
+    cand = sorted((k for k, v in tot.items() if v > 0 and k != "other"), key=lambda k: (-tot[k], k))
+    keep = cand[:MAX_TYPE_BANDS]
+    if "unknown" in cand and "unknown" not in keep:
+        keep = sorted(keep[:MAX_TYPE_BANDS - 1] + ["unknown"], key=lambda k: (-tot[k], k))
+    if any(v > 0 and k not in keep for k, v in tot.items()):
+        keep.append("other")
+    return keep
+
+
+def type_shares(tw, total_weight, types):
+    """Each band's share of `total_weight` in percent (_pct), in `types` order; everything not
+    named in `types` goes to "other"."""
+    named = set(types)
+    out = []
+    for g in types:
+        if g == "other":
+            v = sum(x for k, x in tw.items() if k not in named or k == "other")
+        else:
+            v = tw.get(g, 0)
+        out.append(_pct(v / total_weight))
+    return out
 
 
 def _as_int(v):
@@ -318,6 +396,7 @@ def build(cache_dir, census_lines, releases=None):
         "first_partial": False,
         "small_below": SMALL_SAMPLE_NODES,
         "groups": [],
+        "types": [],
         "days": [],
         "releases": [],
         "eras": [],
@@ -343,12 +422,23 @@ def build(cache_dir, census_lines, releases=None):
     groups = version_groups(day_counts, [m["v"] for m in marks])
     vset = set(groups)
 
+    # spam by type: only days where every block carries sewage_by_type
+    dtw = {d: type_weights(bs) for d, bs in byday.items()}
+    types = type_bands([tw for tw in dtw.values() if tw is not None])
+    if types and out["last24h"] is not None:
+        win = _last_24h_blocks(blocks)
+        tw = type_weights(win)
+        if tw is not None:
+            out["last24h"]["t"] = type_shares(tw, sum(b["weight"] for b in win), types)
+
     days = []
     for d in range(first, last + 1):
         row = {"d": _iso(d)}
         bs = byday.get(d)
         if bs:
             row.update(w=_pct(_weighted(bs)), m=_pct(_mean(bs)), n=len(bs))
+            if types and dtw[d] is not None:
+                row["t"] = type_shares(dtw[d], sum(b["weight"] for b in bs), types)
         else:
             row["n"] = 0
         if d in day_counts:
@@ -360,6 +450,7 @@ def build(cache_dir, census_lines, releases=None):
             row["c"] = sum(day_counts[d].values())
         days.append(row)
     out["groups"] = groups
+    out["types"] = types
     out["days"] = days
     out["releases"] = [{"v": m["v"], "d": _iso(m["day"])} for m in marks]
     out["eras"] = build_eras(byday, first, last, marks)
@@ -605,7 +696,90 @@ def _run_self_test():
         finally:
             shutil.rmtree(d)
 
-    for t in (test_unsafe_files_skipped, test_corrupt_cache_exit, test_weighted_share, test_partial_day_excluded,
+    def test_types():
+        d = tempfile.mkdtemp()
+        try:
+            # days 20000..20003 complete, 20004 holds the newest block (partial).
+            # day 20001 has one unmapped block; every other day is fully mapped.
+            # 2 blocks per day, weight 1000 each, share 0.5 and 0.1 -> sewage weight 600/day.
+            def mk(i, with_map, m):
+                t = D0 + i * _DAY
+                b1, b2 = blk(100 + 4 * i, t + 10, 0.5, 1000), blk(101 + 4 * i, t + 20, 0.1, 1000)
+                if with_map:
+                    b1["sewage_by_type"], b2["sewage_by_type"] = m
+                return [b1, b2]
+            bl = []
+            # 8 types plus a tiny unknown: unknown must displace the 6th type; f,g,h fold to other
+            m1 = {"a": 200, "b": 100, "c": 60, "d": 50, "e": 40, "f": 20, "g": 15, "h": 10, "unknown": 5}  # 500
+            m2 = {"a": 60, "b": 40}                                      # 100
+            for i in range(4):
+                bl += mk(i, i != 1, (m1, m2))
+            bl[2]["sewage_by_type"] = {"a": 1}                           # day 20001: block 0 mapped,
+            bl[3].pop("sewage_by_type", None)                            # block 1 not -> partial
+            bl.append(blk(500, D0 + 4 * _DAY + 5, 0.0, 1000))            # newest, unmapped
+            write_batch(d, 0, bl, lo=0, hi=999)
+            out = build(d, [])
+            rows = {r["d"]: r for r in out["days"]}
+            ty = out["types"]
+            check("types: top 6 by weight + unknown + other",
+                  ty, ["a", "b", "c", "d", "e", "unknown", "other"])
+            check("types: unknown kept though tiny", "unknown" in ty, True)
+            check("types: other last", ty[-1], "other")
+            check("partial day omits t", "t" in rows[_iso(20001)], False)
+            check("full days carry t", [("t" in rows[_iso(20000 + i)]) for i in (0, 2, 3)], [True] * 3)
+            for i in (0, 2, 3):
+                r = rows[_iso(20000 + i)]
+                check("t length == types", len(r["t"]), len(ty))
+                check("t sums to w within rounding", abs(sum(r["t"]) - r["w"]) <= 0.05 * len(ty), True)
+            r = rows[_iso(20000)]
+            check("t values (shares of 2000 weight)", r["t"],
+                  [_pct(260 / 2000), _pct(140 / 2000), _pct(60 / 2000), _pct(50 / 2000), _pct(40 / 2000),
+                   _pct(5 / 2000), _pct((20 + 15 + 10) / 2000)])
+            check("last24h without maps has no t", "t" in out["last24h"], False)
+            # no maps at all
+            plain = [{k: v for k, v in b.items() if k != "sewage_by_type"} for b in bl]
+            write_batch(d, 0, plain, lo=0, hi=999)
+            o2 = build(d, [])
+            check("no maps -> types []", o2["types"], [])
+            check("no maps -> no t anywhere", any("t" in r for r in o2["days"]) or "t" in o2["last24h"], False)
+            # only the last two complete days have maps, newest block mapped: last24h.t present
+            part = [dict(b) for b in plain]
+            for b in part:
+                if b["time"] >= D0 + 3 * _DAY:
+                    b["sewage_by_type"] = {"x_type": 100} if b["height"] != 500 else {}
+            write_batch(d, 0, part, lo=0, hi=999)
+            o3 = build(d, [])
+            check("recent-only maps: one type", o3["types"], ["x_type"])
+            check("recent-only maps: last24h.t present", o3["last24h"].get("t"), [_pct(200 / 3000)])
+            check("recent-only maps: older days plain", [("t" in r) for r in o3["days"]],
+                  [False, False, False, True])
+            # a type id invalid -> map dropped for that block -> day without t
+            bad = [dict(b) for b in part]
+            for b in bad:
+                if b["height"] == 101 + 4 * 3:
+                    b["sewage_by_type"] = {"BAD": 1}
+            write_batch(d, 0, bad, lo=0, hi=999)
+            o4 = build(d, [])
+            check("invalid map -> day loses t", [("t" in r) for r in o4["days"]][3], False)
+            check("invalid map -> block still counted", o4["days"][3]["n"], 2)
+            ov = [dict(b) for b in part]
+            ov[-3]["sewage_by_type"] = {"x_type": 2000}                  # > block weight
+            write_batch(d, 0, ov, lo=0, hi=999)
+            check("map over block weight dropped", "t" in build(d, [])["days"][3], False)
+            # a real type named "other" is folded, and unknown outside the top 6 still wins a slot
+            fo = [dict(b) for b in plain]
+            for b in fo:
+                b["sewage_by_type"] = {"other": 10, "unknown": 1, "p": 9, "q": 8, "r": 7, "s": 6, "t": 5, "u": 4}
+            write_batch(d, 0, fo, lo=0, hi=999)
+            o5 = build(d, [])
+            check("unknown kept below the cut, other folds", o5["types"],
+                  ["p", "q", "r", "s", "t", "unknown", "other"])
+            row = o5["days"][0]
+            check("folded other share", row["t"][-1], _pct(2 * (10 + 4) / 2000))
+        finally:
+            shutil.rmtree(d)
+
+    for t in (test_types, test_unsafe_files_skipped,test_corrupt_cache_exit, test_weighted_share, test_partial_day_excluded,
               test_grouping_and_rounding, test_release_markers, test_full_build, test_no_cache, test_grader_version_rejected, test_cache_dedupe_and_junk):
         t()
     print("\n%s" % ("ALL PASS" if not failed else "%d FAILED" % failed))
