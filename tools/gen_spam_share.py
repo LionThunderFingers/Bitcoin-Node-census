@@ -18,7 +18,7 @@ always give the same output. The cache is treated as untrusted input and re-vali
 
 Spam by type (additive): when cached blocks carry cesspool's `sewage_by_type` map ({type id:
 sewage weight}), a day with EVERY block mapped gets `t`: each type's share of that day's whole
-block weight in percent, in the order of the top-level `types` (up to 6 types by total weight,
+block weight in percent, in the order of the top-level `types` (up to 6 types by peak daily share,
 `unknown` always kept when present, the rest folded into "other", last). A day with any
 unmapped block has no `t` (partial coverage would understate). `last24h.t` works the same way.
 Without any maps `types` is [] and no `t` appears.
@@ -49,7 +49,7 @@ _HASH = re.compile(r"[0-9a-f]{64}")
 _VERSION = re.compile(r"[A-Za-z0-9.+_-]{1,64}")
 _TYPE_ID = re.compile(r"[a-z0-9_]{1,40}")
 MAX_TYPE_BANDS = 6        # spam types drawn as their own band; the rest fold into "other"
-_BATCH_NAME =re.compile(r"([0-9]{1,7})\.json")
+_BATCH_NAME = re.compile(r"([0-9]{1,7})\.json")
 _PLUMB = re.compile(r"plumb", re.I)
 # first version-looking token (two-digit major, so dates like 11.16.2026 never match)
 _UA_VERSION = re.compile(r"[:]([0-9]{2}\.[0-9]{1,2}\.[0-9]{1,2})(?![0-9])")
@@ -231,20 +231,25 @@ def type_weights(blocks):
     return tw
 
 
-def type_bands(weights):
-    """Band order for the type split from a list of {type: weight} dicts (one per fully covered
-    day): up to MAX_TYPE_BANDS types by total weight, largest first (ties by id), `unknown`
-    always included when it has any weight; the rest fold into "other", last, when used.
-    A real type literally called "other" is folded too."""
-    tot = {}
-    for tw in weights:
+def type_bands(days):
+    """Band order for the type split from a list of (type weights, day block weight) pairs, one
+    per fully covered day: up to MAX_TYPE_BANDS types ranked by PEAK daily share (max over days
+    of type weight / day weight), highest first (ties by id), so a type that spikes for a couple
+    of days gets its own band even if small in total. `unknown` is always included when it has
+    any weight; the rest fold into "other", last, when used. A real type literally called
+    "other" is folded too."""
+    peak = {}
+    used = set()
+    for tw, dw in days:
         for k, v in tw.items():
-            tot[k] = tot.get(k, 0) + v
-    cand = sorted((k for k, v in tot.items() if v > 0 and k != "other"), key=lambda k: (-tot[k], k))
+            if v > 0:
+                used.add(k)
+                peak[k] = max(peak.get(k, 0.0), v / dw)
+    cand = sorted((k for k in peak if k != "other"), key=lambda k: (-peak[k], k))
     keep = cand[:MAX_TYPE_BANDS]
     if "unknown" in cand and "unknown" not in keep:
-        keep = sorted(keep[:MAX_TYPE_BANDS - 1] + ["unknown"], key=lambda k: (-tot[k], k))
-    if any(v > 0 and k not in keep for k, v in tot.items()):
+        keep = sorted(keep[:MAX_TYPE_BANDS - 1] + ["unknown"], key=lambda k: (-peak[k], k))
+    if any(k not in keep for k in used):
         keep.append("other")
     return keep
 
@@ -424,7 +429,7 @@ def build(cache_dir, census_lines, releases=None):
 
     # spam by type: only days where every block carries sewage_by_type
     dtw = {d: type_weights(bs) for d, bs in byday.items()}
-    types = type_bands([tw for tw in dtw.values() if tw is not None])
+    types = type_bands([(tw, sum(b["weight"] for b in byday[d])) for d, tw in dtw.items() if tw is not None])
     if types and out["last24h"] is not None:
         win = _last_24h_blocks(blocks)
         tw = type_weights(win)
@@ -776,6 +781,18 @@ def _run_self_test():
                   ["p", "q", "r", "s", "t", "unknown", "other"])
             row = o5["days"][0]
             check("folded other share", row["t"][-1], _pct(2 * (10 + 4) / 2000))
+            # peak beats total: 'spike' is tiny in total (one day) but has the highest single-day share
+            sp = [dict(b) for b in plain]
+            for b in sp:
+                m = {c: 10 for c in "pqrstuv"}                           # steady: 7 types
+                if b["time"] // _DAY == 20002:
+                    m["spike"] = 400
+                b["sewage_by_type"] = m
+            write_batch(d, 0, sp, lo=0, hi=999)
+            o6 = build(d, [])
+            check("spike type gets a band, ranked first", o6["types"][0], "spike")
+            check("max 6 named + other", (len(o6["types"]), o6["types"][-1]), (7, "other"))
+            check("spike share on its day", o6["days"][2]["t"][0], _pct(800 / 2000))
         finally:
             shutil.rmtree(d)
 
