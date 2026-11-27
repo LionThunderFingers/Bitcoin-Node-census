@@ -1167,7 +1167,7 @@ let SPAM_SERIES = null;   // {days, groups, markers, eras, grader, last24, btime
 const SS_NS = "http://www.w3.org/2000/svg";
 const SS_BLUES = ["var(--ss-v1)", "var(--ss-v2)", "var(--ss-v3)", "var(--ss-v4)", "var(--ss-v5)"];
 const SS_GROUP = /^(?:[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|Plumb|other)$/;
-const SS_TYPE = /^[a-z0-9_]{1,40}$/;
+const SS_TYPE = /^[a-z0-9_-]{1,40}$/;
 const SS_ERA =/^(?:all days|(?:before )?[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$/;
 const SS_STYLE = {
   halo: "paint-order:stroke;stroke:var(--surface);stroke-width:3px",
@@ -1189,7 +1189,7 @@ const ssIso = n => new Date(n * 864e5).toISOString().slice(0, 10);
 const ssLabel = s => MONTHS[+s.slice(5, 7) - 1] + " " + (+s.slice(8));
 const ssP1 = v => v.toFixed(1);
 const ssGroupLabel = g => g === "other" ? "other (renamed builds)" : g;
-const ssTypeLabel = g => g === "other" ? "other types" : g.replace(/_/g, " ");
+const ssTypeLabel = g => g === "other" ? "other types" : g.replace(/[-_]/g, " ");
 
 function renderSpamShare(d) {
   const sec = $("spamShareSection");
@@ -1318,8 +1318,9 @@ function ssSwatch(S, g) {
   return s;
 }
 // Spam type colours depend on the id only, never on rank: known ids are fixed, `unknown` is the
-// red, `other` the muted grey, any other id hashes (FNV-1a) into the same 7-colour palette.
-const SS_TYPE_FIXED = { inscription: 1, fake_multisig: 2, padded_fake_multisig: 3, op_return_stuffing: 4 };
+// red, `other` the muted grey, any other id hashes (FNV-1a) into the same 8-colour palette.
+const SS_TYPE_FIXED = { "inscription": 1, "fake-multisig": 2, "fake-multisig-padded": 3, "opreturn-data": 4,
+  "witness-data": 5, "fake-multisig-equal": 6, "runes": 7, "bare-multisig": 8 };
 function ssTypeColour(S, g) {
   if (g === "unknown") return "var(--ss-unknown)";
   if (g === "other") return "var(--ss-tother)";
@@ -1327,7 +1328,7 @@ function ssTypeColour(S, g) {
   if (!k) {
     let h = 0x811c9dc5;
     for (let i = 0; i < g.length; i++) { h ^= g.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
-    k = 1 + h % 7;
+    k = 1 + h % 8;
   }
   return "var(--ss-t" + k + ")";
 }
